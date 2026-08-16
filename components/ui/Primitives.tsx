@@ -87,6 +87,18 @@ export function ClassificationBadge({ classification }: { classification: Source
   return <span className={className}>{label}</span>;
 }
 
+/** PASS/WARN/FAIL/UNKNOWN constraint status pill (blueprint §3). */
+export function StatusBadge({ status }: { status: "PASS" | "WARN" | "FAIL" | "UNKNOWN" }) {
+  const className = `badge badge-${status.toLowerCase()}`;
+  return <span className={className}>{status}</span>;
+}
+
+/** PURSUE/HOLD/REJECT decision pill (blueprint §11). */
+export function DecisionBadge({ classification }: { classification: "PURSUE" | "HOLD" | "REJECT" }) {
+  const className = `badge badge-${classification.toLowerCase()}`;
+  return <span className={className}>{classification}</span>;
+}
+
 export function IssueList({ issues }: { issues: GeometryIssue[] }) {
   if (issues.length === 0) return null;
   return (

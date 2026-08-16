@@ -330,6 +330,54 @@ a:hover {
   color: #a9c9ee;
 }
 
+.badge-pass,
+.badge-pursue {
+  background: var(--success-muted);
+  border-color: var(--success);
+  color: #8fd4a8;
+}
+
+.badge-warn,
+.badge-hold {
+  background: var(--warning-muted);
+  border-color: var(--warning-border);
+  color: #e3bd7f;
+}
+
+.badge-fail,
+.badge-reject {
+  background: var(--danger-muted);
+  border-color: var(--danger-border);
+  color: #f0a9a6;
+}
+
+.badge-unknown {
+  background: var(--surface-3);
+  border-color: var(--border-default);
+  color: var(--text-tertiary, var(--text-secondary));
+}
+
+.insight-positive {
+  color: #8fd4a8;
+}
+
+.insight-negative {
+  color: #f0a9a6;
+}
+
+.constraint-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-subtle, var(--border-default));
+}
+
+.constraint-row:last-child {
+  border-bottom: none;
+}
+
 /* --------------------------------------------------------------------- */
 /* Layout                                                                 */
 /* --------------------------------------------------------------------- */

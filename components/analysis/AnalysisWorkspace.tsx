@@ -13,6 +13,7 @@ import { useAnalysisTools } from "./useAnalysisTools";
 import { useSiteAnalyses } from "./useSiteAnalyses";
 import { WEIGHT_PROFILES, DEFAULT_WEIGHT_PROFILE, type WeightProfile } from "@/lib/scoring/weights";
 import { AnalysisTab } from "./AnalysisTab";
+import { FeasibilityPanel } from "./FeasibilityPanel";
 import { CompareTab } from "./CompareTab";
 import { FinancialsTab } from "./FinancialsTab";
 import { SimulationTab } from "./SimulationTab";
@@ -21,7 +22,15 @@ import { AnalystTab } from "./AnalystTab";
 import { UnderwriteAI } from "./UnderwriteAI";
 import { InvestmentSummary } from "@/components/report/InvestmentSummary";
 
-export type AnalysisMainTab = "analysis" | "compare" | "financials" | "simulation" | "evidence" | "analyst" | "report";
+export type AnalysisMainTab =
+  | "analysis"
+  | "feasibility"
+  | "compare"
+  | "financials"
+  | "simulation"
+  | "evidence"
+  | "analyst"
+  | "report";
 
 export function AnalysisWorkspace({
   project,
@@ -128,6 +137,9 @@ export function AnalysisWorkspace({
           onCustomProfileChange={setCustomProfile}
           onResetToPreset={() => setCustomProfile(null)}
         />
+      ) : null}
+      {tab === "feasibility" ? (
+        <FeasibilityPanel site={selectedSite} analysis={selectedAnalysis} tools={tools} />
       ) : null}
       {tab === "compare" ? <CompareTab analyses={analysisList} tools={tools} /> : null}
       {tab === "financials" ? <FinancialsTab site={selectedSite} tools={tools} /> : null}

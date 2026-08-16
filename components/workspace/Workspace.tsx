@@ -46,6 +46,7 @@ type MainTab = "map" | AnalysisMainTab;
 const MAIN_TABS: Array<{ id: MainTab; label: string }> = [
   { id: "map", label: "Map & Sites" },
   { id: "analysis", label: "Analysis" },
+  { id: "feasibility", label: "Feasibility" },
   { id: "compare", label: "Compare" },
   { id: "financials", label: "Financials" },
   { id: "simulation", label: "Simulation" },
