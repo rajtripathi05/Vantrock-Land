@@ -13,10 +13,14 @@ import { formatArea, formatIndianNumber } from "@/lib/geo/units";
 import { explainRanking, explainWhyNot } from "@/lib/ai/explain";
 import { formatMetricValue } from "@/lib/analysis/format";
 import { categoryPerformance } from "@/lib/scoring/rollup";
+import { scoreSite } from "@/lib/scoring/engine";
+import { detectWinnerReversal } from "@/lib/scoring/winner-reversal";
+import type { WeightProfile } from "@/lib/scoring/weights";
 import type { AnalysisTools } from "@/lib/ai/tools";
 import type { FinancialScenarioResult } from "@/lib/financial/types";
 import type { ConstraintsResult } from "@/lib/analysis/constraints";
 import { StatusBadge } from "@/components/ui/Primitives";
+import { WeightControls } from "./WeightControls";
 
 const CATEGORY_LABELS: Record<MetricCategory, string> = {
   geography: "Site quality",
@@ -92,12 +96,78 @@ function useConstraints(
   return constraints;
 }
 
+/**
+ * Winner reversal (blueprint §15) — apply a hypothetical category reweight
+ * across every compared site at once (reusing the same reweightCategory()/
+ * scoreSite() the per-site Analysis-tab sliders use) and check whether the
+ * shortlist leader changes. Deterministic; no financial-side assumptions
+ * changed here (score-based leader only — see docs for scope).
+ */
+function WinnerReversalCheck({ analyses, baseProfile }: { analyses: SiteAnalysis[]; baseProfile: WeightProfile }) {
+  const [testProfile, setTestProfile] = useState<WeightProfile | null>(null);
+
+  const scenarioAnalyses = useMemo(() => {
+    if (!testProfile) return analyses;
+    return analyses.map((a) => ({ ...a, score: scoreSite(a.metrics, testProfile) }));
+  }, [analyses, testProfile]);
+
+  const result = useMemo(
+    () => detectWinnerReversal(analyses, scenarioAnalyses),
+    [analyses, scenarioAnalyses],
+  );
+
+  if (analyses.length < 2) return null;
+  const referenceMetrics = analyses[0]!.metrics;
+
+  return (
+    <Section title="Winner reversal check">
+      <div className="field-hint" style={{ marginBottom: 10 }}>
+        Adjust category weights below to test whether a different mandate emphasis flips the shortlist
+        leader — every compared site is rescored with the same hypothetical profile.
+      </div>
+      <WeightControls
+        profile={testProfile ?? baseProfile}
+        metrics={referenceMetrics}
+        onChange={setTestProfile}
+        onReset={() => setTestProfile(null)}
+        isCustom={testProfile !== null}
+      />
+      {testProfile ? (
+        <div className={result.changed ? "alert alert-warning" : "alert alert-info"} style={{ marginTop: 12 }}>
+          <div className="alert-title">{result.changed ? "WINNER CHANGED" : "Winner unchanged"}</div>
+          {result.changed ? (
+            <>
+              From <strong>{result.baseline_winner_name}</strong> to <strong>{result.scenario_winner_name}</strong>.
+              <div className="stack-sm" style={{ marginTop: 6 }}>
+                {result.deltas.map((d) => (
+                  <div key={d.site_id} className="data-row">
+                    <span className="data-key">{d.site_name}</span>
+                    <span className="data-value">
+                      {(d.baseline_score * 100).toFixed(1)} → {(d.scenario_score * 100).toFixed(1)} (
+                      {d.delta >= 0 ? "+" : ""}
+                      {(d.delta * 100).toFixed(1)} pts)
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            `${result.baseline_winner_name} still leads under this weighting.`
+          )}
+        </div>
+      ) : null}
+    </Section>
+  );
+}
+
 export function CompareTab({
   analyses,
   tools,
+  activeProfile,
 }: {
   analyses: SiteAnalysis[];
   tools: AnalysisTools | null;
+  activeProfile: WeightProfile;
 }) {
   const ranked = useMemo(
     () => [...analyses].sort((a, b) => (b.score?.total ?? 0) - (a.score?.total ?? 0)),
@@ -173,6 +243,8 @@ export function CompareTab({
           })}
         </div>
       ) : null}
+
+      <WinnerReversalCheck analyses={analyses} baseProfile={activeProfile} />
 
       <div className="table-wrap">
         <table className="table">

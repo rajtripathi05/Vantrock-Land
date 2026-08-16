@@ -114,12 +114,42 @@ export class DemoAIProvider implements AIProvider {
       );
     }
 
+    let finalSummary = summaryParts.join(" ");
+    let finalReasons = reasons;
+    let finalRisks = risks;
+
+    if (mode === "challenge" && target) {
+      const weakest = [...target.category_breakdown].sort(
+        (a, b) => (a.performance ?? 1) - (b.performance ?? 1),
+      )[0];
+      finalSummary =
+        `CHALLENGE: ${target.site_name} scores ${pct(target.score_total)}, but that rests on ${pct(target.coverage)} data coverage. ` +
+        (weakest ? `Its weakest category is ${weakest.label} at ${pct(weakest.performance)} of benchmark. ` : "") +
+        "The recommendation below is only as strong as its weakest input — review every risk and uncertainty listed before treating this as a green light.";
+      finalRisks = [
+        ...(weakest ? [`Most fragile category: ${weakest.label} (${pct(weakest.performance)} of benchmark) — a downward revision here would move the score materially.`] : []),
+        ...risks,
+        target.coverage !== null && target.coverage < 0.8
+          ? `Weakest-confidence data point: only ${pct(target.coverage)} of scoring weight is backed by real (non-missing, non-low-confidence) data.`
+          : "Score coverage is high, but every CURATED/DERIVED assumption below is still Vantrock's own judgement, not a verified market figure.",
+      ];
+      finalReasons = target.financial_base && !target.financial_base.land_price_known
+        ? ["No land price is entered — the financial case cannot be stress-tested until one is, which alone should block a PURSUE decision."]
+        : [`For this recommendation to flip, the weakest category (${weakest?.label ?? "site quality"}) or the base-case IRR assumption would need to move against the site.`];
+    }
+
+    if (mode === "memo" && target) {
+      finalSummary =
+        `EXECUTIVE SUMMARY — ${target.site_name}: ${summaryParts.join(" ")} ` +
+        `Investment thesis: a ${recommendation} case for a Grade-A logistics acquisition in the Pune/Chakan/Talegaon corridor, subject to the assumptions and data gaps below.`;
+    }
+
     return {
       recommendation,
       confidence,
-      summary: summaryParts.join(" "),
-      reasons,
-      risks,
+      summary: finalSummary,
+      reasons: finalReasons,
+      risks: finalRisks,
       financial_drivers: financialDrivers,
       assumptions,
       uncertainties,

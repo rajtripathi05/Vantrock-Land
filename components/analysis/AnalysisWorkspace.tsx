@@ -141,7 +141,9 @@ export function AnalysisWorkspace({
       {tab === "feasibility" ? (
         <FeasibilityPanel site={selectedSite} analysis={selectedAnalysis} tools={tools} />
       ) : null}
-      {tab === "compare" ? <CompareTab analyses={analysisList} tools={tools} /> : null}
+      {tab === "compare" ? (
+        <CompareTab analyses={analysisList} tools={tools} activeProfile={activeProfile} />
+      ) : null}
       {tab === "financials" ? <FinancialsTab site={selectedSite} tools={tools} /> : null}
       {tab === "simulation" ? <SimulationTab site={selectedSite} analysis={selectedAnalysis} tools={tools} /> : null}
       {tab === "evidence" ? <EvidenceTab site={selectedSite} analysis={selectedAnalysis} /> : null}

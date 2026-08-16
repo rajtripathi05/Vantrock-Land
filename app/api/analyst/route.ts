@@ -17,7 +17,7 @@ import { DemoAIProvider, getAIProvider, structuredAnalystResponseSchema } from "
 
 const requestSchema = z
   .object({
-    mode: z.enum(["underwrite", "research"]),
+    mode: z.enum(["underwrite", "research", "challenge", "memo"]),
     question: z.string().trim().min(1).max(500),
     context: analystContextSchema,
   })

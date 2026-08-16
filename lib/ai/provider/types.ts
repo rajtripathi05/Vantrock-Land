@@ -1,7 +1,7 @@
 import type { AnalystContext } from "@/lib/ai/context";
 import type { StructuredAnalystResponse } from "./schema";
 
-export type AnalystMode = "underwrite" | "research";
+export type AnalystMode = "underwrite" | "research" | "challenge" | "memo";
 
 export interface AskAnalystRequest {
   mode: AnalystMode;

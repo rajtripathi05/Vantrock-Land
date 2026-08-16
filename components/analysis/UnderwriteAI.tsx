@@ -21,10 +21,11 @@ import type { FinancialScenarioResult } from "@/lib/financial/types";
 import { buildAnalystContext } from "@/lib/ai/context";
 import { askAnalyst, type AskAnalystResponse } from "@/lib/ai/client";
 
-type Mode = "underwrite" | "research";
+type Mode = "underwrite" | "research" | "challenge" | "memo";
 
 const UNDERWRITE_PROMPTS = [
   "Why is this site the best option?",
+  "Explain this site's score.",
   "What are the top risks?",
   "What assumptions drive the decision?",
   "What would change the ranking?",
@@ -36,6 +37,22 @@ const RESEARCH_PROMPTS = [
   "Research infrastructure planned near this site.",
   "What should I tell the investment committee?",
 ];
+
+const CHALLENGE_PROMPTS = [
+  "Challenge this deal.",
+  "What could make this investment fail?",
+  "Which assumption is most fragile?",
+  "What would change the recommendation?",
+];
+
+const MEMO_PROMPTS = ["Generate the investment memo for this site."];
+
+const MODE_LABELS: Record<Mode, string> = {
+  underwrite: "Underwrite",
+  research: "Research",
+  challenge: "Challenge Deal",
+  memo: "Generate Memo",
+};
 
 export function UnderwriteAI({
   project,
@@ -56,7 +73,14 @@ export function UnderwriteAI({
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<AskAnalystResponse | null>(null);
 
-  const prompts = mode === "underwrite" ? UNDERWRITE_PROMPTS : RESEARCH_PROMPTS;
+  const prompts =
+    mode === "underwrite"
+      ? UNDERWRITE_PROMPTS
+      : mode === "research"
+        ? RESEARCH_PROMPTS
+        : mode === "challenge"
+          ? CHALLENGE_PROMPTS
+          : MEMO_PROMPTS;
 
   const targetSite = useMemo(
     () => analyses.find((a) => a.site.id === selectedSiteId) ?? analyses[0] ?? null,
@@ -104,26 +128,27 @@ export function UnderwriteAI({
     <div className="stack" style={{ maxWidth: 720, marginTop: 28 }}>
       <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
         <h2 style={{ fontSize: 16 }}>AI Analyst</h2>
-        <div className="row" style={{ gap: 6 }}>
-          <button
-            className={mode === "underwrite" ? "btn btn-primary btn-sm" : "btn btn-sm"}
-            onClick={() => setMode("underwrite")}
-          >
-            Underwrite
-          </button>
-          <button
-            className={mode === "research" ? "btn btn-primary btn-sm" : "btn btn-sm"}
-            onClick={() => setMode("research")}
-          >
-            Research
-          </button>
+        <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+          {(Object.keys(MODE_LABELS) as Mode[]).map((m) => (
+            <button
+              key={m}
+              className={mode === m ? "btn btn-primary btn-sm" : "btn btn-sm"}
+              onClick={() => setMode(m)}
+            >
+              {MODE_LABELS[m]}
+            </button>
+          ))}
         </div>
       </div>
 
       <p className="field-hint">
         {mode === "underwrite"
           ? "Reasons over this session's score, comparison, and financial outputs. Never calculates a number — only explains ones already computed."
-          : "May use live web search for current external information (infrastructure, planning, market news). Every claim is labeled EXTERNAL RESEARCH with a real source link, never blended with platform data."}
+          : mode === "research"
+            ? "May use live web search for current external information (infrastructure, planning, market news). Every claim is labeled EXTERNAL RESEARCH with a real source link, never blended with platform data."
+            : mode === "challenge"
+              ? "Actively attacks the investment thesis: fragile assumptions, weakest data, and what would flip the recommendation. Grounded in platform data only."
+              : "Builds a structured investment-committee memo (executive summary, thesis, drivers, financial case, risks, assumptions, data gaps) from platform data only."}
       </p>
 
       {disabledReason ? (
@@ -188,10 +213,10 @@ export function UnderwriteAI({
 function RecommendationBadge({ recommendation }: { recommendation: string }) {
   const className =
     recommendation === "PURSUE"
-      ? "badge badge-accent"
+      ? "badge badge-pursue"
       : recommendation === "REJECT"
-        ? "badge badge-mock"
-        : "badge badge-curated";
+        ? "badge badge-reject"
+        : "badge badge-hold";
   return <span className={className}>{recommendation}</span>;
 }
 

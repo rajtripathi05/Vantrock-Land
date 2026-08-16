@@ -84,4 +84,29 @@ describe("DemoAIProvider", () => {
     const result = await provider.answer({ mode: "underwrite", question: "Q", context: context() });
     expect(result.uncertainties.some((u) => u.toLowerCase().includes("human review"))).toBe(true);
   });
+
+  it("challenge mode names the weakest category as a fragile assumption", async () => {
+    const provider = new DemoAIProvider();
+    const result = await provider.answer({ mode: "challenge", question: "Challenge this deal.", context: context() });
+    expect(() => structuredAnalystResponseSchema.parse(result)).not.toThrow();
+    expect(result.summary).toContain("CHALLENGE");
+    expect(result.risks.some((r) => r.toLowerCase().includes("fragile"))).toBe(true);
+  });
+
+  it("challenge mode flags missing land price as blocking a PURSUE decision", async () => {
+    const provider = new DemoAIProvider();
+    const noLandPrice = context({
+      sites: [{ ...context().sites[0]!, financial_base: { ...context().sites[0]!.financial_base!, land_price_known: false } }],
+    });
+    const result = await provider.answer({ mode: "challenge", question: "Challenge this deal.", context: noLandPrice });
+    expect(result.reasons.some((r) => r.toLowerCase().includes("land price"))).toBe(true);
+  });
+
+  it("memo mode produces an executive-summary-framed response", async () => {
+    const provider = new DemoAIProvider();
+    const result = await provider.answer({ mode: "memo", question: "Generate the memo.", context: context() });
+    expect(() => structuredAnalystResponseSchema.parse(result)).not.toThrow();
+    expect(result.summary).toContain("EXECUTIVE SUMMARY");
+    expect(result.summary.toLowerCase()).toContain("investment thesis");
+  });
 });
