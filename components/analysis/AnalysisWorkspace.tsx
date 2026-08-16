@@ -12,6 +12,7 @@ import type { Project, Site } from "@/types/domain";
 import { useAnalysisTools } from "./useAnalysisTools";
 import { useSiteAnalyses } from "./useSiteAnalyses";
 import { WEIGHT_PROFILES, DEFAULT_WEIGHT_PROFILE, type WeightProfile } from "@/lib/scoring/weights";
+import { OverviewTab } from "./OverviewTab";
 import { AnalysisTab } from "./AnalysisTab";
 import { FeasibilityPanel } from "./FeasibilityPanel";
 import { CompareTab } from "./CompareTab";
@@ -23,6 +24,7 @@ import { UnderwriteAI } from "./UnderwriteAI";
 import { InvestmentSummary } from "@/components/report/InvestmentSummary";
 
 export type AnalysisMainTab =
+  | "overview"
   | "analysis"
   | "feasibility"
   | "compare"
@@ -89,7 +91,7 @@ export function AnalysisWorkspace({
   if (sites.length === 0) {
     return (
       <div className="empty-state">
-        No candidate sites yet. Draw and save at least one boundary on the Map &amp; Sites tab before
+        No candidate sites yet. Draw and save at least one boundary on the Map tab before
         running analysis.
       </div>
     );
@@ -97,7 +99,7 @@ export function AnalysisWorkspace({
 
   return (
     <div className="stack">
-      {tab !== "compare" && tab !== "report" ? (
+      {tab !== "compare" && tab !== "report" && tab !== "overview" ? (
         <div className="field" style={{ maxWidth: 320, margin: 0 }}>
           <label htmlFor="analysis-site-select">Site</label>
           <select
@@ -126,6 +128,16 @@ export function AnalysisWorkspace({
         </div>
       ) : null}
 
+      {tab === "overview" ? (
+        <OverviewTab
+          project={project}
+          sites={sites}
+          analyses={analyses}
+          tools={tools}
+          selectedSiteId={selectedSiteId}
+          onSelectSite={onSelectSite}
+        />
+      ) : null}
       {tab === "analysis" ? (
         <AnalysisTab
           site={selectedSite}

@@ -231,7 +231,7 @@ export function FeasibilityPanel({
           </>
         ) : (
           <div className="field-hint">
-            UNKNOWN — no land price entered for this site. Set one on the Map &amp; Sites tab to compute land economics.
+            UNKNOWN — no land price entered for this site. Set one on the Map tab to compute land economics.
           </div>
         )}
       </Section>

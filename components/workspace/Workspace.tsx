@@ -44,20 +44,21 @@ const TOOLS: Array<{ id: DrawTool; name: string; hint: string }> = [
 type MainTab = "map" | AnalysisMainTab;
 
 const MAIN_TABS: Array<{ id: MainTab; label: string }> = [
-  { id: "map", label: "Map & Sites" },
-  { id: "analysis", label: "Analysis" },
-  { id: "feasibility", label: "Feasibility" },
+  { id: "overview", label: "Overview" },
+  { id: "map", label: "Map" },
+  { id: "analysis", label: "Analyze" },
   { id: "compare", label: "Compare" },
+  { id: "simulation", label: "Simulate" },
+  { id: "feasibility", label: "Feasibility" },
   { id: "financials", label: "Financials" },
-  { id: "simulation", label: "Simulation" },
   { id: "evidence", label: "Evidence" },
-  { id: "analyst", label: "Analyst" },
-  { id: "report", label: "Report" },
+  { id: "analyst", label: "AI" },
+  { id: "report", label: "Memo" },
 ];
 
 export function Workspace({ project }: { project: Project }) {
   const api = useMemo(() => getApiClient(), []);
-  const [mainTab, setMainTab] = useState<MainTab>("map");
+  const [mainTab, setMainTab] = useState<MainTab>("overview");
 
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);

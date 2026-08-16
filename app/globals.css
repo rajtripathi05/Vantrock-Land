@@ -357,6 +357,24 @@ a:hover {
   color: var(--text-tertiary, var(--text-secondary));
 }
 
+.badge-dq-good {
+  background: var(--success-muted);
+  border-color: var(--success);
+  color: #8fd4a8;
+}
+
+.badge-dq-fair {
+  background: var(--warning-muted);
+  border-color: var(--warning-border);
+  color: #e3bd7f;
+}
+
+.badge-dq-limited {
+  background: var(--danger-muted);
+  border-color: var(--danger-border);
+  color: #f0a9a6;
+}
+
 .insight-positive {
   color: #8fd4a8;
 }

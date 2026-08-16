@@ -230,6 +230,37 @@ export function SimulationTab({
         </Section>
 
         <Section title="Financial Overrides">
+          <div className="field-hint" style={{ marginBottom: 8 }}>
+            What do you want to test?
+          </div>
+          <div className="row" style={{ gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+            {(
+              [
+                { label: "Land +10%", key: "land_price_per_acre_inr" as const, pct: 0.1 },
+                { label: "Rent −5%", key: "rent_inr_per_sqft_per_month" as const, pct: -0.05 },
+                { label: "Build cost +10%", key: "construction_cost_inr_per_sqft" as const, pct: 0.1 },
+              ] as const
+            ).map((preset) => {
+              const inputData = baseFinancials?.inputs[preset.key];
+              const baseValue = inputData && typeof inputData === "object" && "value" in inputData ? (inputData.value as number | null) : null;
+              return (
+                <button
+                  key={preset.label}
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={baseValue === null || baseValue === undefined}
+                  onClick={() =>
+                    setFinancialOverrides((prev) => ({
+                      ...prev,
+                      [preset.key]: Math.round((baseValue ?? 0) * (1 + preset.pct)),
+                    }))
+                  }
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
+          </div>
           {FINANCIAL_FIELDS.map((field) => {
             const currentValue = financialOverrides[field.key as keyof FinancialOverrides];
             const inputData = baseFinancials?.inputs[field.key as keyof typeof baseFinancials.inputs];
@@ -283,19 +314,19 @@ export function SimulationTab({
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>CURRENT</div>
-            <div style={{ fontSize: 28, fontWeight: 700 }}>{base.score?.total.toFixed(1)}</div>
-            <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>Confidence: {(base.score?.confidence ?? 0).toFixed(0)}%</div>
+            <div style={{ fontSize: 28, fontWeight: 700 }}>{((base.score?.total ?? 0) * 100).toFixed(1)}</div>
+            <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>Confidence: {((base.score?.confidence ?? 0) * 100).toFixed(0)}%</div>
           </div>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>SIMULATED</div>
-            <div style={{ fontSize: 28, fontWeight: 700 }}>{sim?.score?.total.toFixed(1)}</div>
-            <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>Confidence: {(sim?.score?.confidence ?? 0).toFixed(0)}%</div>
+            <div style={{ fontSize: 28, fontWeight: 700 }}>{((sim?.score?.total ?? 0) * 100).toFixed(1)}</div>
+            <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>Confidence: {((sim?.score?.confidence ?? 0) * 100).toFixed(0)}%</div>
           </div>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>DELTA</div>
             <div style={{ fontSize: 28, fontWeight: 700, color: scoreGap > 0 ? "#22c55e" : scoreGap < 0 ? "#ef4444" : "#666" }}>
               {scoreGap > 0 ? "+" : scoreGap < 0 ? "−" : "±"}
-              {Math.abs(scoreGap).toFixed(1)}
+              {Math.abs(scoreGap * 100).toFixed(1)}
             </div>
           </div>
         </div>

@@ -1,8 +1,9 @@
 # Manual Actions Required
 
 This file lists everything that needs a human — an account, an API key, a manual
-dashboard click, a command run by hand. **Nothing in this MVP is currently blocked** — the
-app runs with zero configuration — but read Priority 1 before you assume a feature is
+dashboard click, a command run by hand. The app itself still runs with zero configuration
+using the local IndexedDB driver; **Priority 0 below lists the two things blocking a live
+Supabase + Netlify deployment specifically** — read that before you assume a feature is
 "missing" rather than "waiting on you."
 
 Checkboxes track what's been done in *your* environment, not this session's. They start
@@ -12,9 +13,75 @@ unchecked regardless of what this session verified.
 
 ## PRIORITY 0 — MUST DO
 
-None right now. `npm install && npm run dev` runs the full application with zero
-configuration. Come back to this section if a future session adds something that blocks
-the app from running.
+### Action: Run the missing Supabase table-grants migration
+
+**Why:** live-tested this session with `NEXT_PUBLIC_PERSISTENCE_DRIVER=supabase` and the
+credentials already in `.env.local` — the Projects page fails to load with
+`STORAGE_UNAVAILABLE — Supabase projects.listByOwner failed: permission denied for table
+projects`. This is a **table-level GRANT** missing on the `anon`/`authenticated` roles,
+which is a different, earlier failure than an RLS policy denial (`0001_init.sql`'s RLS
+policies are correct and were not the problem — Postgres never gets to evaluate them
+without the underlying grant). `supabase/migrations/0002_grants.sql` (added this session)
+fixes it with explicit `grant select, insert, update, delete ... to anon, authenticated`
+statements. I cannot run this myself — it requires your Supabase SQL Editor login.
+
+**Exact steps:**
+1. Open the [Supabase Dashboard](https://supabase.com/dashboard) → your project → **SQL
+   Editor**.
+2. Run the full contents of `supabase/migrations/0002_grants.sql`.
+3. Reload the app with `NEXT_PUBLIC_PERSISTENCE_DRIVER=supabase` set.
+
+**How to verify it worked:** the Projects page loads without the `STORAGE_UNAVAILABLE`
+banner, and creating a project succeeds.
+
+**Done when:** `STORAGE_UNAVAILABLE` no longer appears and projects/sites persist to the
+Supabase Table Editor.
+
+- [ ] Ran `supabase/migrations/0002_grants.sql` in the SQL Editor
+- [ ] Verified: Projects page loads with no `STORAGE_UNAVAILABLE` error
+
+---
+
+### Action: Connect Netlify to `rajtripathi05/Vantrock-Land`
+
+**Why:** the codebase, tests, and build are production-ready and pushed to
+`origin/main`, but going live requires clicking through Netlify's own dashboard —
+something no CLI/agent can do on your behalf without your login.
+
+**Exact steps:**
+1. Open the [Netlify dashboard](https://app.netlify.com) → **Add new site → Import an
+   existing project** → GitHub → select `rajtripathi05/Vantrock-Land`.
+2. Build command: `npm run build` (Netlify auto-detects this from `netlify.toml`, which
+   also declares the `@netlify/plugin-nextjs` plugin — do not deploy `.next` manually and
+   do not switch this to a static export).
+3. Branch to deploy: `main`.
+4. **Site configuration → Environment variables** — set every variable listed in the table
+   in `docs/DEPLOYMENT.md` → "Netlify setup". At minimum for a working deploy:
+   `NEXT_PUBLIC_PERSISTENCE_DRIVER=supabase`, `NEXT_PUBLIC_SUPABASE_URL`,
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_BASEMAP`, `DEMO_ACCESS_PASSWORD`. Add
+   `AI_PROVIDER=openrouter` + `OPENROUTER_API_KEY` + `OPENROUTER_MODEL` if you want live AI
+   responses instead of the deterministic demo provider (see "Configure OpenRouter" below).
+5. Deploy.
+
+**Security warning:** never paste a secret value into this file, `netlify.toml`, or any
+committed file — only into the Netlify environment variable UI. Never set
+`NEXT_PUBLIC_OPENROUTER_API_KEY`, `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY`, or
+`NEXT_PUBLIC_DEMO_ACCESS_PASSWORD` — the `NEXT_PUBLIC_` prefix ships a variable to the
+browser.
+
+**How to verify it worked:** run through the production verification checklist in
+`docs/DEPLOYMENT.md` → "Pre-deploy checklist" against the live Netlify URL: log in, draw
+and save sites, run analysis, compare, simulate, and confirm `OPENROUTER_API_KEY` never
+appears in the browser (Network tab / page source / `localStorage`).
+
+**Done when:** the Netlify production URL loads, authentication works, and Supabase reads
+and writes succeed against the real project (this depends on the grants action above being
+done first).
+
+- [ ] Netlify site connected to `rajtripathi05/Vantrock-Land`, branch `main`
+- [ ] All required environment variables set in the Netlify UI (not committed anywhere)
+- [ ] Production URL verified against the full workflow checklist
+- [ ] Confirmed `OPENROUTER_API_KEY` never appears client-side in production
 
 ---
 

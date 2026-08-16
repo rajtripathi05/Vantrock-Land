@@ -128,7 +128,7 @@ export function FinancialsTab({ site, tools }: { site: Site | null; tools: Analy
         <div className="alert alert-warning">
           <div className="alert-title">Land price not entered</div>
           Total development cost, yield-on-cost, equity, IRR, and equity multiple cannot be computed
-          without a land price. Enter one on the Map &amp; Sites tab, in the selected site&apos;s
+          without a land price. Enter one on the Map tab, in the selected site&apos;s
           Commercial section.
         </div>
       ) : null}

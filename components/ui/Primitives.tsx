@@ -99,6 +99,25 @@ export function DecisionBadge({ classification }: { classification: "PURSUE" | "
   return <span className={className}>{classification}</span>;
 }
 
+export type DataQualityLevel = "GOOD" | "FAIR" | "LIMITED";
+
+/**
+ * Coverage/confidence rolled into one UI-layer label so a score never reads
+ * as more certain than the data behind it. Presentation-only threshold —
+ * not a scoring input.
+ */
+export function dataQualityLevel(coverage: number, confidence: number): DataQualityLevel {
+  if (coverage >= 0.8 && confidence >= 0.8) return "GOOD";
+  if (coverage >= 0.5 && confidence >= 0.5) return "FAIR";
+  return "LIMITED";
+}
+
+export function DataQualityBadge({ coverage, confidence }: { coverage: number; confidence: number }) {
+  const level = dataQualityLevel(coverage, confidence);
+  const className = `badge badge-dq-${level.toLowerCase()}`;
+  return <span className={className}>{level}</span>;
+}
+
 export function IssueList({ issues }: { issues: GeometryIssue[] }) {
   if (issues.length === 0) return null;
   return (

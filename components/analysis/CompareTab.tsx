@@ -7,7 +7,7 @@
  * potentially-inconsistent narrative.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Metric, MetricCategory, SiteAnalysis } from "@/types/domain";
 import { formatArea, formatIndianNumber } from "@/lib/geo/units";
 import { explainRanking, explainWhyNot } from "@/lib/ai/explain";
@@ -17,10 +17,9 @@ import { scoreSite } from "@/lib/scoring/engine";
 import { detectWinnerReversal } from "@/lib/scoring/winner-reversal";
 import type { WeightProfile } from "@/lib/scoring/weights";
 import type { AnalysisTools } from "@/lib/ai/tools";
-import type { FinancialScenarioResult } from "@/lib/financial/types";
-import type { ConstraintsResult } from "@/lib/analysis/constraints";
 import { StatusBadge } from "@/components/ui/Primitives";
 import { WeightControls } from "./WeightControls";
+import { useBaseCaseFinancials, useConstraints } from "./useShortlistBundles";
 
 const CATEGORY_LABELS: Record<MetricCategory, string> = {
   geography: "Site quality",
@@ -33,68 +32,6 @@ const CATEGORY_LABELS: Record<MetricCategory, string> = {
   infrastructure_future: "Future infrastructure",
 };
 const CATEGORIES: MetricCategory[] = ["accessibility", "infrastructure", "market", "labour", "geography"];
-
-/** Base-case IRR is close enough for the comparison table to stay small; the Financials tab has all three scenarios. */
-function useBaseCaseFinancials(
-  tools: AnalysisTools | null,
-  analyses: readonly SiteAnalysis[],
-): Record<string, FinancialScenarioResult | null> {
-  const [financials, setFinancials] = useState<Record<string, FinancialScenarioResult | null>>({});
-  const siteIds = analyses.map((a) => a.site.id).join(",");
-
-  useEffect(() => {
-    if (!tools || analyses.length === 0) {
-      setFinancials({});
-      return;
-    }
-    let cancelled = false;
-    void Promise.all(
-      analyses.map(async (a) => {
-        const result = await tools.getFinancials(a.site.id, "base");
-        return [a.site.id, result.ok ? result.value : null] as const;
-      }),
-    ).then((entries) => {
-      if (!cancelled) setFinancials(Object.fromEntries(entries));
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tools, siteIds]);
-
-  return financials;
-}
-
-/** Site Screening feasibility status per site (blueprint §12), fetched once per shortlist. */
-function useConstraints(
-  tools: AnalysisTools | null,
-  analyses: readonly SiteAnalysis[],
-): Record<string, ConstraintsResult | null> {
-  const [constraints, setConstraints] = useState<Record<string, ConstraintsResult | null>>({});
-  const siteIds = analyses.map((a) => a.site.id).join(",");
-
-  useEffect(() => {
-    if (!tools || analyses.length === 0) {
-      setConstraints({});
-      return;
-    }
-    let cancelled = false;
-    void Promise.all(
-      analyses.map(async (a) => {
-        const result = await tools.getConstraints(a.site.id);
-        return [a.site.id, result.ok ? result.value : null] as const;
-      }),
-    ).then((entries) => {
-      if (!cancelled) setConstraints(Object.fromEntries(entries));
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tools, siteIds]);
-
-  return constraints;
-}
 
 /**
  * Winner reversal (blueprint §15) — apply a hypothetical category reweight
