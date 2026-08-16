@@ -15,6 +15,8 @@ import { formatMetricValue } from "@/lib/analysis/format";
 import { categoryPerformance } from "@/lib/scoring/rollup";
 import type { AnalysisTools } from "@/lib/ai/tools";
 import type { FinancialScenarioResult } from "@/lib/financial/types";
+import type { ConstraintsResult } from "@/lib/analysis/constraints";
+import { StatusBadge } from "@/components/ui/Primitives";
 
 const CATEGORY_LABELS: Record<MetricCategory, string> = {
   geography: "Site quality",
@@ -59,6 +61,37 @@ function useBaseCaseFinancials(
   return financials;
 }
 
+/** Site Screening feasibility status per site (blueprint §12), fetched once per shortlist. */
+function useConstraints(
+  tools: AnalysisTools | null,
+  analyses: readonly SiteAnalysis[],
+): Record<string, ConstraintsResult | null> {
+  const [constraints, setConstraints] = useState<Record<string, ConstraintsResult | null>>({});
+  const siteIds = analyses.map((a) => a.site.id).join(",");
+
+  useEffect(() => {
+    if (!tools || analyses.length === 0) {
+      setConstraints({});
+      return;
+    }
+    let cancelled = false;
+    void Promise.all(
+      analyses.map(async (a) => {
+        const result = await tools.getConstraints(a.site.id);
+        return [a.site.id, result.ok ? result.value : null] as const;
+      }),
+    ).then((entries) => {
+      if (!cancelled) setConstraints(Object.fromEntries(entries));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tools, siteIds]);
+
+  return constraints;
+}
+
 export function CompareTab({
   analyses,
   tools,
@@ -71,6 +104,7 @@ export function CompareTab({
     [analyses],
   );
   const financials = useBaseCaseFinancials(tools, analyses);
+  const constraints = useConstraints(tools, analyses);
 
   if (analyses.length === 0) {
     return <div className="empty-state">Save at least one candidate site to compare.</div>;
@@ -226,6 +260,32 @@ export function CompareTab({
               {ranked.map((a) => {
                 const multiple = financials[a.site.id]?.outputs.equity_multiple ?? null;
                 return <td key={a.site.id}>{multiple === null ? "—" : `${multiple.toFixed(2)}x`}</td>;
+              })}
+            </tr>
+            <tr>
+              <td>Residual land value (RLV)</td>
+              {ranked.map((a) => {
+                const rlv = financials[a.site.id]?.outputs.residual_land_value_inr ?? null;
+                return <td key={a.site.id}>{rlv === null ? "—" : formatIndianNumber(rlv, 0)}</td>;
+              })}
+            </tr>
+            <tr>
+              <td>Risk (high-severity warnings)</td>
+              {ranked.map((a) => {
+                const count = a.warnings.filter((w) => w.severity === "high").length;
+                return (
+                  <td key={a.site.id} style={{ color: count > 0 ? "var(--danger)" : undefined }}>
+                    {count}
+                  </td>
+                );
+              })}
+            </tr>
+            <tr>
+              <td style={{ fontWeight: 700 }}>Feasibility</td>
+              {ranked.map((a) => {
+                const c = constraints[a.site.id];
+                const status = !c ? null : c.excluded ? "FAIL" : c.fail_count > 0 || c.warn_count > 0 ? "WARN" : "PASS";
+                return <td key={a.site.id}>{status ? <StatusBadge status={status} /> : "—"}</td>;
               })}
             </tr>
           </tbody>

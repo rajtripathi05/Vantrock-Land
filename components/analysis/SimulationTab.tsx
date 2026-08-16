@@ -10,6 +10,30 @@ import { WEIGHT_PROFILES, DEFAULT_WEIGHT_PROFILE } from "@/lib/scoring/weights";
 import { scoreSite } from "@/lib/scoring/engine";
 import { formatInr } from "@/lib/geo/units";
 import { Section } from "@/components/ui/Primitives";
+import type { SensitivityDimension, SensitivityPoint, BreakEvenResult } from "@/lib/financial/sensitivity";
+
+const SENSITIVITY_DIMENSIONS: Array<{ id: SensitivityDimension; label: string }> = [
+  { id: "land_price", label: "Land price" },
+  { id: "rent", label: "Rent" },
+  { id: "construction_cost", label: "Construction cost" },
+  { id: "occupancy", label: "Occupancy" },
+  { id: "target_gfa", label: "Target GFA" },
+];
+
+function fmtSensitivityInput(dimension: SensitivityDimension, value: number): string {
+  switch (dimension) {
+    case "land_price":
+    case "construction_cost":
+      return formatInr(value);
+    case "occupancy":
+      return `${(value * 100).toFixed(0)}%`;
+    case "target_gfa":
+      return `${Math.round(value).toLocaleString("en-IN")} sf`;
+    case "rent":
+    default:
+      return `₹${value.toFixed(0)}/sf/mo`;
+  }
+}
 
 interface SimulationState {
   baseline: {
@@ -51,6 +75,47 @@ export function SimulationTab({
   const [simulationProfile, setSimulationProfile] = useState<WeightProfile>(DEFAULT_WEIGHT_PROFILE);
   const [financialOverrides, setFinancialOverrides] = useState<FinancialOverrides>({});
   const [loading, setLoading] = useState(false);
+  const [sensitivity, setSensitivity] = useState<Record<SensitivityDimension, SensitivityPoint[]> | null>(null);
+  const [targetIrrPct, setTargetIrrPct] = useState(14);
+  const [breakEven, setBreakEven] = useState<Record<SensitivityDimension, BreakEvenResult> | null>(null);
+
+  // Sensitivity + break-even (blueprint §9/§10) — deterministic, one fetch per site.
+  useEffect(() => {
+    if (!tools || !site) {
+      setSensitivity(null);
+      setBreakEven(null);
+      return;
+    }
+    let cancelled = false;
+    void tools.getSensitivity(site.id).then((result) => {
+      if (!cancelled && result.ok) setSensitivity(result.value);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [tools, site]);
+
+  useEffect(() => {
+    if (!tools || !site) {
+      setBreakEven(null);
+      return;
+    }
+    let cancelled = false;
+    const target = targetIrrPct / 100;
+    void Promise.all(
+      SENSITIVITY_DIMENSIONS.map(({ id }) => tools.getBreakEven(site.id, id, target)),
+    ).then((results) => {
+      if (cancelled) return;
+      const map = {} as Record<SensitivityDimension, BreakEvenResult>;
+      results.forEach((result, index) => {
+        if (result.ok) map[SENSITIVITY_DIMENSIONS[index]!.id] = result.value;
+      });
+      setBreakEven(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [tools, site, targetIrrPct]);
 
   // Capture baseline when site changes or analysis updates
   useEffect(() => {
@@ -290,6 +355,94 @@ export function SimulationTab({
           </div>
         </Section>
       ) : null}
+
+      {/* Sensitivity analysis (blueprint §9) */}
+      <Section title="Sensitivity — IRR vs. key assumptions">
+        {sensitivity ? (
+          <div style={{ overflowX: "auto" }}>
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Dimension</th>
+                  <th>-20%</th>
+                  <th>-10%</th>
+                  <th>Base</th>
+                  <th>+10%</th>
+                  <th>+20%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {SENSITIVITY_DIMENSIONS.map(({ id, label }) => {
+                  const points = sensitivity[id];
+                  return (
+                    <tr key={id}>
+                      <td>{label}</td>
+                      {points && points.length === 5
+                        ? points.map((point, index) => (
+                            <td key={index} style={{ fontWeight: point.multiplier === 1 ? 700 : 400 }}>
+                              {point.irr_pct !== null ? `${(point.irr_pct * 100).toFixed(1)}%` : "—"}
+                              <div className="field-hint">{fmtSensitivityInput(id, point.input_value)}</div>
+                            </td>
+                          ))
+                        : (
+                            <td colSpan={5} className="field-hint">
+                              No land price entered — sensitivity requires a land price.
+                            </td>
+                          )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="loading-note">Computing sensitivity…</div>
+        )}
+      </Section>
+
+      {/* Break-even analysis (blueprint §10) */}
+      <Section
+        title="Break-even analysis"
+        action={
+          <div className="row" style={{ gap: 6, alignItems: "center" }}>
+            <label htmlFor="target-irr" className="field-hint" style={{ margin: 0 }}>
+              Target IRR
+            </label>
+            <input
+              id="target-irr"
+              type="number"
+              className="input"
+              style={{ width: 70 }}
+              value={targetIrrPct}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (!Number.isNaN(v)) setTargetIrrPct(v);
+              }}
+            />
+            <span className="field-hint">%</span>
+          </div>
+        }
+      >
+        {breakEven ? (
+          <div className="stack-sm">
+            {SENSITIVITY_DIMENSIONS.map(({ id, label }) => {
+              const result = breakEven[id];
+              return (
+                <div key={id} className="data-row">
+                  <span className="data-key">Break-even {label.toLowerCase()}</span>
+                  <span className="data-value">
+                    {result?.break_even_value !== null && result?.break_even_value !== undefined
+                      ? fmtSensitivityInput(id, result.break_even_value)
+                      : result?.note ?? "—"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="loading-note">Computing break-even values…</div>
+        )}
+      </Section>
     </div>
   );
 }
