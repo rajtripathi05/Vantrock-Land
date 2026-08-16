@@ -33,3 +33,57 @@ Require stack:
   code: 'MODULE_NOT_FOUND',
   requireStack: [Array]
 }
+ ⨯ ./lib/repositories/supabase/client.ts:9:1
+Module not found: Can't resolve '@supabase/supabase-js'
+   7 |  */
+   8 |
+>  9 | import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+     | ^
+  10 |
+  11 | let client: SupabaseClient | null = null;
+  12 |
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./lib/repositories/supabase/index.ts
+./lib/repositories/index.ts
+./lib/client/local-api.ts
+./lib/client/index.ts
+./app/page.tsx
+ ⨯ ./lib/repositories/supabase/client.ts:9:1
+Module not found: Can't resolve '@supabase/supabase-js'
+   7 |  */
+   8 |
+>  9 | import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+     | ^
+  10 |
+  11 | let client: SupabaseClient | null = null;
+  12 |
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./lib/repositories/supabase/index.ts
+./lib/repositories/index.ts
+./lib/client/local-api.ts
+./lib/client/index.ts
+./app/page.tsx
+ ⨯ ./lib/repositories/supabase/client.ts:9:1
+Module not found: Can't resolve '@supabase/supabase-js'
+   7 |  */
+   8 |
+>  9 | import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+     | ^
+  10 |
+  11 | let client: SupabaseClient | null = null;
+  12 |
+
+https://nextjs.org/docs/messages/module-not-found
+
+Import trace for requested module:
+./lib/repositories/supabase/index.ts
+./lib/repositories/index.ts
+./lib/client/local-api.ts
+./lib/client/index.ts
+./app/page.tsx

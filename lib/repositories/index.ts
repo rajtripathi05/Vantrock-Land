@@ -9,6 +9,7 @@
 import { getPersistenceDriver } from "@/lib/config/env";
 import type { RepositoryBundle } from "./types";
 import { createIndexedDbRepositories } from "./indexeddb";
+import { createSupabaseRepositories } from "./supabase";
 
 let bundle: RepositoryBundle | null = null;
 
@@ -21,12 +22,10 @@ export function getRepositories(): RepositoryBundle {
       bundle = createIndexedDbRepositories();
       return bundle;
     case "supabase":
-      // Deliberately a hard failure rather than a silent fallback to local
-      // storage. Believing you are writing to Supabase while writing to the
-      // browser is a far worse outcome than an explicit crash.
-      throw new Error(
-        "The Supabase persistence driver is not implemented yet. Set NEXT_PUBLIC_PERSISTENCE_DRIVER=indexeddb.",
-      );
+      // Throws loudly (via getSupabaseClient) if the env vars aren't set,
+      // rather than silently falling back to local storage.
+      bundle = createSupabaseRepositories();
+      return bundle;
     default: {
       const exhaustive: never = driver;
       throw new Error(`Unknown persistence driver: ${String(exhaustive)}`);

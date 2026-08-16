@@ -52,62 +52,61 @@ infrastructure metrics for a site in the corridor.
 
 ---
 
-### Action: Connect Supabase (when you're ready to leave local-first mode)
+### Action: Connect Supabase (ENGINEERING DONE — this is now a credentials-only step)
 
-**Why:** the repository architecture is built for this swap
-(`lib/repositories/types.ts`), but it is **deliberately not connected** — the project brief
-requires explicit manual authorization before any Supabase connection happens. Doing this
-today would replace browser-local storage with a real hosted Postgres database — a
-meaningful, semi-irreversible step, not something to do casually.
+**Why:** as of the Supabase integration phase, `lib/repositories/supabase/` fully
+implements `RepositoryBundle` (projects + sites) against Postgres/PostGIS via
+`@supabase/supabase-js`, and `supabase/migrations/0001_init.sql` defines the schema.
+`lib/repositories/index.ts` now routes the `"supabase"` driver to it — no engineering work
+remains, only a real Supabase project and its credentials, which this session cannot create
+on your behalf (no account access).
 
-**Exact steps (when you decide to do this):**
+**Exact steps:**
 1. Open the [Supabase Dashboard](https://supabase.com/dashboard) and either open your
-   existing project or create a new one.
-2. In the project, go to **Database → Extensions**, search for `postgis`, and enable it.
-3. Go to **SQL Editor**, and run a migration that creates the schema described in
-   `docs/DECISIONS.md` → "Local-first with IndexedDB, Supabase reserved but not connected"
-   (tables: `projects`, `sites`, and eventually `roads`, `pois`, `infrastructure`,
-   `hazards`, `metrics`, `analysis_runs`, `scores`, `scenarios`, `sources`, `evidence`,
-   `reports` — use `geometry(MultiPolygon, 4326)` / PostGIS `geography` columns per the
-   migration notes already written in `lib/geo/measure.ts`). **This migration does not
-   exist yet in this repository — writing it is the first implementation step, not
-   something to copy-paste from here.**
-4. In **Project Settings → API**, copy the **Project URL** and the **anon/public key**.
-5. Create `.env.local` in the repository root (copy from `.env.example`) and set:
+   existing project (you have a Pro plan) or create a new one.
+2. Go to **SQL Editor** and run the full contents of
+   `supabase/migrations/0001_init.sql` (it enables `postgis` itself via
+   `create extension if not exists postgis;` — no separate Extensions-tab step needed).
+3. In **Project Settings → API**, copy the **Project URL** and the **anon/public key**.
+4. Create `.env.local` in the repository root (copy from `.env.example`) and set:
    ```
    NEXT_PUBLIC_SUPABASE_URL=<your Project URL>
    NEXT_PUBLIC_SUPABASE_ANON_KEY=<your anon key>
    NEXT_PUBLIC_PERSISTENCE_DRIVER=supabase
    ```
-   Both `NEXT_PUBLIC_*` variables are safe for the browser (anon key is meant to be
-   public, protected by Row Level Security — do not use the `service_role` key here or
-   anywhere under `app/`).
-6. **This will not work yet** — `lib/repositories/index.ts` and `lib/client/index.ts`
-   currently throw a deliberate error for the `supabase` driver, because the Supabase
-   repository implementation itself doesn't exist in this codebase yet. Implementing it
-   (a `createSupabaseRepositories()` matching `RepositoryBundle`) is a follow-up
-   engineering task, not a configuration step.
+   Both are safe for the browser — the anon key is constrained by the RLS policies the
+   migration creates (permissive for now, matching the current single-tenant-behind-a-
+   demo-password posture; see the migration file's RLS comment for the tightening path once
+   real per-analyst Supabase Auth exists).
+5. Restart `npm run dev`.
 
-**Security warning:** never put a `service_role` key in any `NEXT_PUBLIC_*` variable or
-anywhere under `app/` — it bypasses Row Level Security and must stay server-only.
+**Security warning:** never put the `service_role` (secret) key in any `NEXT_PUBLIC_*`
+variable or anywhere under `app/` that runs in the browser — it bypasses RLS. Nothing in
+this codebase currently reads a secret key (no privileged server-side Supabase operation
+exists yet); `SUPABASE_SECRET_KEY` in `.env.example` is reserved for when one is added.
 
-**Test command:** once the repository implementation exists, `npm run dev` and check the
-header's status line reads `local · supabase · N projects` instead of `local · indexeddb ·
-N projects`.
+**Test command:** `npm run dev`, create a project in the UI, then check the Supabase
+Dashboard → **Table Editor** → `projects` table shows the new row, and `sites` shows rows
+after drawing/saving a site.
 
-**How to verify it worked:** create a project in the UI, then check the Supabase Dashboard
-→ **Table Editor** → `projects` table shows the new row.
+**How to verify it worked:** the `sites` table's `geom_geojson` column (a generated column
+mirroring the PostGIS `geom` column) should show valid GeoJSON matching what you drew.
 
-**Done when:** the header status line shows the `supabase` driver and data appears in the
-Supabase Table Editor after creating a project in the app.
+**Done when:** data appears in the Supabase Table Editor after creating a project and
+site in the app with `NEXT_PUBLIC_PERSISTENCE_DRIVER=supabase` set.
 
-- [ ] Created/selected a Supabase project
-- [ ] Enabled the PostGIS extension
-- [ ] Wrote and ran the initial schema migration
+- [ ] Selected the existing Supabase Pro project (or created a new one)
+- [ ] Ran `supabase/migrations/0001_init.sql` in the SQL Editor
 - [ ] Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`
 - [ ] Set `NEXT_PUBLIC_PERSISTENCE_DRIVER=supabase`
-- [ ] Implemented `createSupabaseRepositories()` (engineering task, not a config step)
-- [ ] Verified: header shows `supabase` driver and rows appear in the Table Editor
+- [ ] Verified: rows appear in the Table Editor after creating a project/site in the app
+
+**Note on scope:** this migration only covers `projects`/`sites` — the tables the existing
+repository interfaces actually need. Analysis runs, metrics, scores, financial scenarios,
+evidence, and reports are computed deterministically on read today (no repository contract
+exists for them) and are intentionally NOT persisted yet — adding those tables ahead of a
+real need would be schema speculation. A future phase should add a repository interface for
+them first, then a migration, following the same pattern as this one.
 
 ---
 

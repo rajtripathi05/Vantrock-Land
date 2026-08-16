@@ -7,7 +7,10 @@
  * fallback to local storage when someone believes they configured Supabase is
  * the worst possible outcome.
  *
- * NO SECRETS. Nothing in this phase requires a credential of any kind.
+ * SECRETS: the only ones this file reads (NEXT_PUBLIC_SUPABASE_*) are the
+ * anon key, which is meant to be public and is protected by RLS — never the
+ * service/secret key, which is read only server-side in app/api routes and
+ * never through this module.
  */
 
 import { z } from "zod";
@@ -25,12 +28,25 @@ export type BasemapId = z.infer<typeof basemapSchema>;
 const rawEnv = {
   persistenceDriver: process.env.NEXT_PUBLIC_PERSISTENCE_DRIVER,
   basemap: process.env.NEXT_PUBLIC_BASEMAP,
+  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
 };
 
-const envSchema = z.object({
-  persistenceDriver: persistenceDriverSchema,
-  basemap: basemapSchema,
-});
+const envSchema = z
+  .object({
+    persistenceDriver: persistenceDriverSchema,
+    basemap: basemapSchema,
+    supabaseUrl: z.string().url().optional(),
+    supabaseAnonKey: z.string().min(1).optional(),
+  })
+  .refine(
+    (env) => env.persistenceDriver !== "supabase" || (env.supabaseUrl && env.supabaseAnonKey),
+    {
+      message:
+        "NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are required when " +
+        "NEXT_PUBLIC_PERSISTENCE_DRIVER=supabase",
+    },
+  );
 
 let cached: z.infer<typeof envSchema> | null = null;
 
@@ -40,6 +56,8 @@ function readEnv(): z.infer<typeof envSchema> {
   const parsed = envSchema.safeParse({
     persistenceDriver: rawEnv.persistenceDriver || undefined,
     basemap: rawEnv.basemap || undefined,
+    supabaseUrl: rawEnv.supabaseUrl || undefined,
+    supabaseAnonKey: rawEnv.supabaseAnonKey || undefined,
   });
 
   if (!parsed.success) {
@@ -55,6 +73,11 @@ function readEnv(): z.infer<typeof envSchema> {
 
 export const getPersistenceDriver = (): PersistenceDriver => readEnv().persistenceDriver;
 export const getBasemapId = (): BasemapId => readEnv().basemap;
+
+/** Test-only: force the next readEnv() call to re-parse process.env. */
+export function resetEnvCacheForTests(): void {
+  cached = null;
+}
 
 /**
  * Local-mode owner id.

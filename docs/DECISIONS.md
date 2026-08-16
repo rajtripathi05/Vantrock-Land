@@ -44,21 +44,25 @@ draw session.
 **Impact:** Polygon drawing (including the closing click) works reliably; validated in
 this session's browser verification (draw → save → reload → 3/3 site types confirmed).
 
-## Local-first with IndexedDB, Supabase reserved but not connected
+## Local-first with IndexedDB by default; Supabase implemented, connection is a manual step
 
 **Decision:** all persistence goes through a `RepositoryBundle` interface
-(`lib/repositories/types.ts`), backed today by IndexedDB, with domain types already using
-`snake_case` field names matching the eventual Postgres schema.
-**Why:** The brief is explicit — no Supabase connection without manual authorization, but
-the architecture must make that swap a repository implementation, not a rewrite. Domain
-types (`types/domain.ts`) were written once against the *production* shape (per the
-project's engineering blueprint) rather than against IndexedDB's shape, specifically so
-connecting Supabase later doesn't touch a single service or component.
-**Impact:** `lib/repositories/index.ts` and `lib/client/index.ts` both throw a clear error
-if `NEXT_PUBLIC_PERSISTENCE_DRIVER=supabase` is set — a hard failure rather than a silent
-fallback to local storage, because believing you're writing to Supabase while writing to
-the browser is a far worse outcome than a crash. See MANUAL_ACTIONS.md for the connection
-procedure when it's time.
+(`lib/repositories/types.ts`), with two implementations: IndexedDB (`lib/repositories/
+indexeddb/`, the default) and Postgres/PostGIS via Supabase (`lib/repositories/supabase/`).
+Domain types (`types/domain.ts`) use `snake_case` field names matching the Postgres schema
+in `supabase/migrations/0001_init.sql` exactly.
+**Why:** connecting a *live* Supabase project requires an account/dashboard action only the
+project owner can perform, but there's no reason the repository implementation itself has
+to wait on that — writing it against the documented schema, and testing it against a fake
+`supabase-js` client, carries zero risk to the running local-first app (the driver still
+defaults to `indexeddb`). Domain types were written once against the production shape
+specifically so this swap never touches a service or component.
+**Impact:** `lib/repositories/index.ts` routes `NEXT_PUBLIC_PERSISTENCE_DRIVER=supabase` to
+`createSupabaseRepositories()`, which throws a clear error if
+`NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` aren't set — still a hard failure
+rather than a silent fallback to local storage. See MANUAL_ACTIONS.md for the remaining
+account/credential steps (creating the project, running the migration, setting the env
+vars) — the only things left that this session cannot do unattended.
 
 ## Deterministic scoring and financial engines — no LLM in the numbers
 

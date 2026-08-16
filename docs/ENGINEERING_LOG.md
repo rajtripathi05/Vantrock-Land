@@ -5,6 +5,73 @@ doesn't have to rediscover the codebase from scratch.
 
 ---
 
+## 2026-08-16 — Supabase persistence backend (this session)
+
+**Starting state:** 219/219 tests passing, repo not under git (first action this session:
+`git init` + baseline commit, since the multi-phase Supabase/AI/deploy work ahead needs
+rollback safety). `RepositoryBundle` interface and IndexedDB implementation were the only
+backend; the `"supabase"` driver threw a deliberate "not implemented" error.
+
+**Implemented:**
+- `supabase/migrations/0001_init.sql` — `projects` and `sites` tables matching
+  `types/domain.ts` field-for-field. `sites.geom` is native PostGIS
+  `geometry(MultiPolygon, 4326)` with a GIST index; `geom_geojson`/`point_origin_geojson`
+  are Postgres *generated* columns (`st_asgeojson(geom)::jsonb`) so PostgREST can return
+  GeoJSON directly on a normal `select()` without an RPC round trip, and so the JSON mirror
+  can never drift from the geometry it's derived from. RLS enabled on both tables with a
+  permissive policy for `anon`/`authenticated` — this MVP has no per-user Supabase Auth yet
+  (see the demo-password gate, not yet built either), so RLS can't anchor on `auth.uid()`
+  today; the policy comment documents the tightening path.
+- `lib/repositories/supabase/` — `mappers.ts` (pure row↔domain conversion, unit-tested
+  without any network dependency), `client.ts` (anon-key-only browser client, throws with a
+  clear message if env vars are missing rather than silently degrading), `index.ts`
+  (`SupabaseProjectRepository`/`SupabaseSiteRepository` implementing the exact same
+  `ProjectRepository`/`SiteRepository` interfaces the IndexedDB backend does — no UI or
+  service-layer code changed).
+- `lib/repositories/index.ts` — `"supabase"` case now calls `createSupabaseRepositories()`
+  instead of throwing.
+- `lib/config/env.ts` — added `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  validation, refined so picking the `supabase` driver without both vars set fails loudly
+  at config-read time rather than at first repository call.
+- `package.json` — added `@supabase/supabase-js`.
+- `.env.example` — documented the full variable set for this phase and future phases
+  (Supabase, demo password, OpenRouter) so the shape is visible even before those phases
+  land; no secrets, as before.
+- Docs: MANUAL_ACTIONS.md (Supabase entry rewritten — engineering is done, what's left is
+  purely "create/select a project, run the migration, set two env vars," which only you can
+  do), ROADMAP.md.
+
+**Tests:** 227 passing (up from 219) — 8 new: 5 in
+`tests/repositories/supabase/mappers.test.ts` (pure row↔domain round-trips, including a
+Postgres numeric-as-string coercion case), 3 in `tests/repositories/supabase/index.test.ts`
+(full CRUD against a hand-written fake `supabase-js` query builder —
+`tests/repositories/supabase/fake-client.ts` — exercising the real repository classes
+against fake data, same "test the code that ships" pattern
+`tests/helpers/repositories.ts` uses for IndexedDB, not a hand-rolled repository fake).
+
+**Verification:** `npm run check` (typecheck/lint/test) clean, `npm run build` clean
+production build. No browser verification possible for this slice — it requires a live
+Supabase project, which is the manual boundary this phase stops at (see MANUAL_ACTIONS.md).
+
+**Decision:** did not create tables for analysis runs/metrics/scores/financial scenarios/
+evidence/reports. Those are computed deterministically on read (`lib/analysis`,
+`lib/scoring`, `lib/financial`, `lib/evidence`) and have no repository interface yet —
+adding tables ahead of an actual persistence contract would be schema speculation, not
+architecture. Extend when a future phase gives them a real repository need.
+
+**Known limitations:**
+- RLS is permissive (`using (true)`), not per-owner — acceptable for a single-tenant demo
+  behind a server-side password gate (not yet built), documented as needing tightening once
+  real Supabase Auth exists.
+- No Supabase project is connected yet — `NEXT_PUBLIC_PERSISTENCE_DRIVER` still defaults to
+  `indexeddb`. This is the manual boundary; see MANUAL_ACTIONS.md → "Connect Supabase."
+
+**Next phase:** per the requested phase order, Phase 2 (server-side demo access gate) does
+not need Supabase credentials and can proceed immediately; Supabase itself stays on
+`indexeddb` until credentials are supplied.
+
+---
+
 ## 2026-08-16 — Phase 9: Site comparison "why not" + financial outcomes (this session)
 
 **Starting state:** Phase 8 (financial overrides) just landed — 208/208 tests. The Compare

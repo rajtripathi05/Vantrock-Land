@@ -123,44 +123,55 @@ Actual Vantrock milestones, not generic software tasks.
   quality (88.8% vs 100.0%)", IRR/equity multiple rows rendered (showing "—" with an
   explanatory hint for sites with no land price entered), zero console errors. 11 new
   tests (5 for `categoryPerformance`, 6 for `explainWhyNot`).
-- **219 automated tests, 0 lint errors, 0 type errors, clean production build.**
+- **227 automated tests, 0 lint errors, 0 type errors, clean production build.**
+- **Supabase persistence backend (engineering complete, 2026-08-16)** —
+  `lib/repositories/supabase/` fully implements `RepositoryBundle` (projects + sites)
+  against Postgres/PostGIS, `supabase/migrations/0001_init.sql` defines the schema
+  (`geometry(MultiPolygon, 4326)`, GIST index, generated GeoJSON mirror columns, permissive
+  RLS pending real auth). `lib/repositories/index.ts` routes the `supabase` driver to it.
+  **Not connected to a live project** — needs a real Supabase URL/anon key, which only the
+  project owner can supply (see `docs/MANUAL_ACTIONS.md`). 8 new tests, all against a fake
+  `supabase-js` client (no live network dependency).
 
 ## IN PROGRESS / PARTIAL
 
-None right now — see COMPLETE below for the two items that were here (weight-profile and
-financial-override UI controls, both landed 2026-08-16).
+None right now.
 
 ## NEXT
 
-1. **Financial assumption override UI controls** — surface `FinancialOverrides`
-   (rent/construction-cost/cap-rate) as interactive inputs in the Financials tab, with
-   downside/base/upside scenario comparison. See Phase 8.
-2. **Sector-specific labour data source** — `labour.population_proxy` is real now (Phase
+1. **Connect a live Supabase project** — manual boundary; see `docs/MANUAL_ACTIONS.md`.
+   Everything else in this list can proceed without it.
+2. **Server-side demo access gate** — password-protected session cookie in front of the
+   whole app, per the product brief. No Supabase/OpenRouter dependency.
+3. **Financial assumption override UI controls** — already landed, see COMPLETE → Phase 8.
+4. **Sector-specific labour data source** — `labour.population_proxy` is real now (Phase
    2); `labour.labour_proxy` still needs an actual labour-market dataset (PLFS district
    data is the leading free candidate) to move beyond permanently missing.
-3. **Climate/hazard data source** — India-WRIS flood layers or Bhuvan hazard atlas.
-4. **Weight-profile persistence** — the interactive sliders (Phase 7) are in-memory per
-   session; persisting a custom profile per project would need a new IndexedDB store +
-   repository method, following the exact pattern in `lib/repositories/`.
-5. **Self-hosted OSRM** — the public demo server used for Phase 1 routing is free but
+5. **Climate/hazard data source** — India-WRIS flood layers or Bhuvan hazard atlas.
+6. **Weight-profile persistence** — the interactive sliders (Phase 7) are in-memory per
+   session; persisting a custom profile per project would need a new repository method
+   (Supabase-backed now that the backend exists) following the pattern in
+   `lib/repositories/`.
+7. **Self-hosted OSRM** — the public demo server used for Phase 1 routing is free but
    explicitly light-use-only; a production deployment should self-host OSRM (see
    `docs/MANUAL_ACTIONS.md`) and swap `lib/providers/routing/osrm.ts`'s base URL. The
    interface does not change.
-6. **Broader population coverage** — only 5 settlement nodes in the corridor carry a
+8. **Broader population coverage** — only 5 settlement nodes in the corridor carry a
    usable OSM population tag today; a Census of India town/village table (downloaded, not
    live) would widen coverage well beyond OSM's sparse tagging without changing the
    `labour.population_proxy` metric shape, just its source.
+9. **Server-side OpenRouter provider** — real LLM-backed analyst (Underwrite + Research
+   modes), needs `OPENROUTER_API_KEY` — see `docs/MANUAL_ACTIONS.md`.
+10. **Netlify deployment prep** — `.env.example` already documents the target variable set.
 
 ## LATER
 
 - **Production basemap** — replace the OSM-dev raster tiles (development-only per OSMF
   policy) with a self-hosted PMTiles extract of the Pune corridor, served from Supabase
   Storage once that's connected. See `docs/MANUAL_ACTIONS.md`.
-- **Supabase / Postgres / PostGIS backend** — the repository interface, domain types
-  (snake_case fields matching the intended schema), and geometry-engine migration notes are
-  all already written for this swap. Not connected — see `docs/MANUAL_ACTIONS.md`.
 - **Authentication / RLS** — `owner_id` and the `listByOwner` query path exist specifically
-  so Supabase RLS has something to anchor to later, without a schema change.
+  so Supabase RLS can anchor to `auth.uid()` later, without a schema change; today's RLS
+  policy is deliberately permissive (single-tenant demo behind a password gate).
 - **PDF export** — currently print-to-PDF via the browser; a dedicated PDF library is
   explicitly out of scope until there's a real reason beyond decoration.
 - **Real LLM-backed analyst** — the deterministic tool layer (`lib/ai/tools.ts`) is
