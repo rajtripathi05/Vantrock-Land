@@ -162,12 +162,58 @@ Actual Vantrock milestones, not generic software tasks.
   project owner can supply (see `docs/MANUAL_ACTIONS.md`). 8 new tests, all against a fake
   `supabase-js` client (no live network dependency).
 
+- **Feasibility, constraints, decision, sensitivity, and quick-insights engines
+  (competitor-enhanced build, 2026-08-17)** — `lib/feasibility/engine.ts`
+  (TestFit-inspired development feasibility proxy: buildable area → warehouse
+  GFA/yard/dock/parking/circulation/open space, target-vs-achievable delta,
+  DeepBlocks-inspired FAR/coverage/height/parking-requirement proxies
+  explicitly labeled ZONING DATA NOT VERIFIED, plus land economics),
+  `lib/analysis/constraints.ts` (ESRI-inspired PASS/WARN/FAIL/UNKNOWN
+  constraints across geography/site-area/access/hazard/climate/development/
+  zoning/financial/data-quality, with explicit exclusion criteria — a failed
+  exclusion marks the site EXCLUDED with named reasons, never silently folded
+  into the score), `lib/scoring/decision.ts` (configurable
+  PURSUE/HOLD/REJECT decision thresholds with per-criterion pass/fail),
+  `lib/financial/sensitivity.ts` (deterministic IRR sensitivity sweeps and
+  bisection break-even solvers across land price/rent/construction cost/
+  occupancy/target GFA), `lib/analysis/insights.ts` (Site Quick Insights —
+  every bullet traces to a real metric/constraint, no invented AI statement),
+  and `lib/scoring/winner-reversal.ts` (detects whether a hypothetical
+  weight-profile change flips the shortlist leader). All pure/deterministic,
+  wired into `lib/ai/tools.ts` as 8 new read-only tools. New **Feasibility**
+  tab (professional site panel with decision badge, quick insights,
+  expandable constraints checklist, area breakdown, land economics),
+  sensitivity/break-even panels in the Simulation tab, an RLV/risk/feasibility
+  screening row and a "Winner reversal check" in the Compare tab. AI layer
+  gained **Challenge Deal** and **Generate Memo** modes (reusing the existing
+  OpenRouter/demo provider + schema, blueprint §24/§25) alongside
+  Underwrite/Research. 42 new tests (292 total), typecheck/lint/build clean.
+  Not attempted this session (see below): a dedicated Site Discovery
+  screening form (§1 — candidate sites are still hand-drawn, by design, per
+  the existing architecture note that automated discovery is a future
+  capability), PlanningProvider/SatelliteProvider/GeoAI provider stubs
+  (§18-21 — would be scope without a real data source behind them), and a
+  full information-architecture reorg (§31) — the existing 8-tab workspace
+  was extended rather than restructured, since restructuring working
+  navigation wasn't asked for on its own merits.
+
 ## IN PROGRESS / PARTIAL
 
 None right now.
 
 ## NEXT
 
+0. **Browser (Playwright) verification of the 2026-08-17 feasibility/constraints/AI-modes slice**
+   — not completed this session: a pre-existing `next dev` process on port 3000 (not started
+   by this session) was already returning HTTP 500 before any of this session's changes were
+   loaded into a browser, and starting a second `next dev` instance against the same `.next`
+   directory produced `EINVAL: readlink` errors (a Windows/OneDrive-path quirk sharing one
+   build output directory between two dev servers). `npm run check` (typecheck + lint + all
+   292 tests) and `npm run build` are clean, so the new code compiles, type-checks, and
+   renders in a static build — but a real click-through of the new Feasibility tab,
+   Simulation sensitivity/break-even panels, Compare screening matrix, and Challenge/Memo AI
+   modes has not been done. Recommend one manual pass (or a fresh `npm run dev` after
+   confirming nothing else holds port 3000) before treating this slice as demo-ready.
 1. **Connect a live Supabase project** — manual, credentials-only boundary; see
    `docs/MANUAL_ACTIONS.md`. The blocking client-factory bug (`lib/client/index.ts` threw
    for the `"supabase"` driver) is fixed as of this session — see ENGINEERING_LOG.md and

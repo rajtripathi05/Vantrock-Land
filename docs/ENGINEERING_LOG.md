@@ -5,6 +5,105 @@ doesn't have to rediscover the codebase from scratch.
 
 ---
 
+## 2026-08-17 — Feasibility, constraints, decision, sensitivity engines + AI Challenge/Memo modes (continuation session)
+
+**Starting state:** 289/289 tests, clean typecheck/lint/build (per the prior session's own
+verification). Prompted with a large competitor-inspired feature brief (LandTech/TestFit/
+ESRI/Cherre/DeepBlocks-pattern capabilities). Given the size of the brief relative to a single
+session, prioritized the highest-leverage, fully-implementable-without-a-new-external-data-
+source items and built them to the same "deterministic engine + tested + real UI" bar as the
+rest of the codebase, rather than spreading thin across every section with stub UI.
+
+**Implemented — deterministic engines (all pure, no LLM, no I/O):**
+- `lib/feasibility/engine.ts` — TestFit-inspired development feasibility proxy. Curated
+  area-ratio assumptions (setback share, ground-coverage ratio, yard/dock/parking/circulation
+  shares of buildable area) applied to the site's own geodesic area, producing buildable
+  area → warehouse GFA → yard → dock/loading apron → parking → circulation → open space, plus
+  a target-vs-achievable GFA delta and DeepBlocks-inspired FAR/coverage/height/parking-
+  requirement proxies explicitly labeled `zoning_verified: false` / "ZONING DATA NOT
+  VERIFIED" — never invented as an official planning figure. `buildLandEconomics()` for
+  cost/sqft, /acre, /GFA breakdowns, `UNKNOWN` (not imputed) when no land price is entered.
+- `lib/analysis/constraints.ts` — ESRI-inspired constraints/exclusions evaluator. Fixed set of
+  checks (site area minimum, study-area membership, highway access, flood exposure, extreme
+  heat, power-infrastructure proximity, development feasibility, zoning, land-price-entered,
+  IRR viability, data coverage), each reporting PASS/WARN/FAIL/UNKNOWN with value/threshold/
+  source/method/confidence. A subset is tagged `is_exclusion`; a FAIL there marks the site
+  `excluded: true` with named reasons — exclusions are surfaced, never hidden inside a lower
+  score, matching the brief's explicit instruction.
+- `lib/scoring/decision.ts` — configurable `DecisionThresholds` (min IRR, min yield-on-cost,
+  max land cost, min score, max high-severity warnings, min coverage) →
+  PURSUE/HOLD/REJECT classification with a reason list. An exclusion-constraint failure
+  short-circuits straight to REJECT regardless of financials; a site failing only the
+  IRR/yield gates because land price is unset gets an honest HOLD, not a REJECT.
+- `lib/financial/sensitivity.ts` — `runSensitivity()`/`runAllSensitivities()` (IRR sweep at
+  ±10%/±20% around the current base value for land price/rent/construction cost/occupancy/
+  target GFA) and `findBreakEven()` (bisection search for the value at which base-case IRR
+  crosses a target threshold). Both built entirely on repeated calls to the existing
+  `buildFinancialScenario()` — no new financial math. Handles the case where a scenario's
+  cash flows never cross zero (`irr()` correctly returns `null` for a genuinely unprofitable
+  deal) by treating that as "worse than any realistic target" for bisection direction, rather
+  than aborting the search — found via a debug script when the naive implementation returned
+  false "target unreachable" results.
+- `lib/analysis/insights.ts` — Site Quick Insights (LandTech-inspired): a short list of
+  deterministic bullets (strong/weak highway access, strong industrial context, flood
+  exposure, low data coverage, strong/weak financial case, high land cost, feasibility
+  shortfall, future-infrastructure upside), each carrying a `ref` back to the metric or
+  constraint it came from — no hallucinated AI statement.
+- `lib/scoring/winner-reversal.ts` — compares a baseline vs. scenario set of scored
+  `SiteAnalysis` and reports whether the shortlist leader changed, with per-site score deltas.
+
+**Implemented — wiring:** `lib/ai/tools.ts` gained 8 new read-only tools (`getFeasibility`,
+`getLandEconomics`, `getConstraints`, `getDataQuality`, `getRecommendation`,
+`getQuickInsights`, `getSensitivity`, `getBreakEven`), all composing the engines above with
+existing site/project data — no new repository or API surface needed.
+
+**Implemented — UI:**
+- New **Feasibility** tab (`components/analysis/FeasibilityPanel.tsx` +
+  `useFeasibilityBundle.ts`): a "professional site panel" header (decision badge, constraint
+  status, score/confidence/IRR/RLV, per-criterion pass/fail), Quick Insights bullets, an
+  expandable PASS/WARN/FAIL/UNKNOWN constraints checklist grouped by category, the feasibility
+  area breakdown, development-constraint proxies, and land economics. New `StatusBadge`/
+  `DecisionBadge` primitives + CSS (`badge-pass/warn/fail/unknown`, `badge-pursue/hold/reject`).
+- Simulation tab: IRR sensitivity table (5 dimensions × 5 points) and a break-even panel
+  (target-IRR input + break-even value per dimension), both per-site.
+- Compare tab: added RLV, risk (high-severity warning count), and a Feasibility PASS/WARN/FAIL
+  column to the existing table; new **Winner reversal check** section — reuses the existing
+  `WeightControls` slider UI to apply a hypothetical category reweight across every compared
+  site at once, rescoring with `scoreSite()` and reporting via `detectWinnerReversal()` whether
+  the leader flips and by how much per site. Deterministic, no LLM involved.
+- AI layer: two new `AnalystMode` values, **challenge** and **memo**, alongside the existing
+  underwrite/research — same schema, same `/api/analyst` route, same OpenRouter/demo-fallback
+  machinery. The OpenRouter system prompt gained mode-specific instructions (challenge: attack
+  the thesis, name the most fragile assumption and weakest-confidence data point; memo: frame
+  the same fields as an executive-summary-led investment memo). `DemoAIProvider` templates both
+  modes deterministically from the same context (no new LLM dependency for the zero-cost
+  path). `UnderwriteAI.tsx` gained mode buttons, suggested prompts, and an "Explain this site's
+  score" underwrite prompt — reuses the existing pipeline, no new mode needed for that one.
+
+**Tests:** 292 passing (up from 289 at the end of the *last* session before this brief — note
+the brief's own "256/256" baseline predates the simulation/climate-provider/future-
+infrastructure work already landed earlier the same day) — 42 new: 7
+`tests/feasibility/engine.test.ts`, 6 `tests/analysis/constraints.test.ts`, 4
+`tests/analysis/insights.test.ts`, 5 `tests/scoring/decision.test.ts`, 3
+`tests/scoring/winner-reversal.test.ts`, 8 `tests/financial/sensitivity.test.ts`, 3 new demo
+AI-provider tests (challenge/memo modes), plus `tests/helpers/analysis-fixtures.ts` (new
+shared `SiteAnalysis`/`SiteScore`/`Metric` fixture builders for the new engine tests).
+
+**Verification:** `npm run check` (typecheck + lint + test) clean, `npm run build` clean
+production build, `git status` clean (`.env.local` and `dev-server*.log` confirmed
+git-ignored). **Not done this session:** a live browser click-through — a pre-existing `next
+dev` process on port 3000 (not started this session) was already returning HTTP 500 before any
+of this session's code was loaded in a browser, and a second `next dev` instance against the
+same `.next` directory hit a Windows/OneDrive-path `EINVAL: readlink` error. See ROADMAP.md →
+NEXT for the recommended follow-up.
+
+**Known limitations / explicitly out of scope this session (see ROADMAP.md for the full
+list):** a dedicated Site Discovery screening form (candidate sites are still hand-drawn, by
+design), Planning/Satellite/GeoAI provider stubs (no real data source to back them yet), and a
+full information-architecture reorg (the 8-tab workspace was extended, not restructured).
+
+---
+
 ## 2026-08-17 — Simulation tab, climate/hazard provider, P0 completion (continuation session)
 
 **Starting state:** 252/252 tests, clean typecheck/lint/build. Previous session had
