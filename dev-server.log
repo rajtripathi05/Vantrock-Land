@@ -1,0 +1,21 @@
+
+> vantrock-intelligence@0.1.0 dev
+> next dev
+
+ ⚠ Port 3000 is in use by process 36180, using available port 3001 instead.
+   ▲ Next.js 15.5.23
+   - Local:        http://localhost:3001
+   - Network:      http://192.168.1.69:3001
+
+ ✓ Starting...
+ ✓ Ready in 1886ms
+ ○ Compiling / ...
+ ✓ Compiled / in 4.5s (654 modules)
+ GET / 200 in 5034ms
+ GET / 200 in 65ms
+ ○ Compiling /projects/[id] ...
+ ✓ Compiled /projects/[id] in 3.3s (768 modules)
+ GET /projects/e6caa558-0407-4d98-a2fa-d850adef274a 200 in 4248ms
+ GET / 200 in 322ms
+ GET /projects/4f6e03f8-487e-417d-8a57-1ed2c172f9c9 200 in 39ms
+[?25h

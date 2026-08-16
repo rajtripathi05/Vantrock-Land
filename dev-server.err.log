@@ -1,0 +1,35 @@
+ ⨯ Error: Cannot find module './833.js'
+Require stack:
+- C:\Users\rajtr\OneDrive\Desktop\V\.next\server\webpack-runtime.js
+- C:\Users\rajtr\OneDrive\Desktop\V\.next\server\app\projects\[id]\page.js
+- C:\Users\rajtr\OneDrive\Desktop\V\node_modules\next\dist\server\require.js
+- C:\Users\rajtr\OneDrive\Desktop\V\node_modules\next\dist\server\load-components.js
+- C:\Users\rajtr\OneDrive\Desktop\V\node_modules\next\dist\build\utils.js
+- C:\Users\rajtr\OneDrive\Desktop\V\node_modules\next\dist\build\swc\options.js
+- C:\Users\rajtr\OneDrive\Desktop\V\node_modules\next\dist\build\swc\index.js
+- C:\Users\rajtr\OneDrive\Desktop\V\node_modules\next\dist\build\next-config-ts\transpile-config.js
+- C:\Users\rajtr\OneDrive\Desktop\V\node_modules\next\dist\server\config.js
+- C:\Users\rajtr\OneDrive\Desktop\V\node_modules\next\dist\server\next.js
+- C:\Users\rajtr\OneDrive\Desktop\V\node_modules\next\dist\server\lib\start-server.js
+    at <unknown> (C:\Users\rajtr\OneDrive\Desktop\V\.next\server\app\page.js:2:12838)
+    at Object.<anonymous> (C:\Users\rajtr\OneDrive\Desktop\V\.next\server\app\page.js:2:12891) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array],
+  page: '/'
+}
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ Failed to generate static paths for /projects/[id]:
+[Error: Cannot find module './vendor-chunks/next.js'
+Require stack:
+- C:\Users\rajtr\OneDrive\Desktop\V\.next\server\webpack-runtime.js
+- C:\Users\rajtr\OneDrive\Desktop\V\.next\server\app\projects\[id]\page.js
+- C:\Users\rajtr\OneDrive\Desktop\V\node_modules\next\dist\server\require.js
+- C:\Users\rajtr\OneDrive\Desktop\V\node_modules\next\dist\server\load-components.js
+- C:\Users\rajtr\OneDrive\Desktop\V\node_modules\next\dist\build\utils.js
+- C:\Users\rajtr\OneDrive\Desktop\V\node_modules\next\dist\server\dev\static-paths-worker.js
+- C:\Users\rajtr\OneDrive\Desktop\V\node_modules\next\dist\compiled\jest-worker\processChild.js] {
+  type: 'Error',
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [Array]
+}
