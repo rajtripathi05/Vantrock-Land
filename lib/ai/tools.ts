@@ -22,9 +22,24 @@ import { scoreSite } from "@/lib/scoring/engine";
 import { DEFAULT_WEIGHT_PROFILE, type WeightProfile } from "@/lib/scoring/weights";
 import { buildAllScenarios, buildFinancialScenario } from "@/lib/financial/engine";
 import type { FinancialOverrides, FinancialScenarioName, FinancialScenarioResult } from "@/lib/financial/types";
+import { runAllSensitivities, findBreakEven, type SensitivityDimension, type SensitivityPoint, type BreakEvenResult } from "@/lib/financial/sensitivity";
 import { collectEvidence, getEvidenceByIds } from "@/lib/evidence/collect";
+import { buildDevelopmentFeasibility, buildLandEconomics, type LandEconomicsResult } from "@/lib/feasibility/engine";
+import type { DevelopmentFeasibilityResult } from "@/lib/feasibility/types";
+import { evaluateConstraints, type ConstraintsResult } from "@/lib/analysis/constraints";
+import { generateQuickInsights, type QuickInsight } from "@/lib/analysis/insights";
+import { classifyDecision, DEFAULT_DECISION_THRESHOLDS, type DecisionResult, type DecisionThresholds } from "@/lib/scoring/decision";
 import type { Site } from "@/types/domain";
 import { err, ok, type Metric, type Result, type SiteAnalysis, type SourceMetadata } from "@/types/domain";
+
+export interface DataQualitySummary {
+  coverage: number;
+  confidence: number;
+  source_count: number;
+  live_source_count: number;
+  missing_metric_count: number;
+  low_confidence_metric_count: number;
+}
 
 export interface AnalysisToolsDeps {
   api: ApiClient;
@@ -194,5 +209,129 @@ export class AnalysisTools {
     const result = await this.getSiteAnalysis(siteId);
     if (!result.ok) return result;
     return ok(evidenceIds ? getEvidenceByIds(result.value, evidenceIds) : collectEvidence(result.value));
+  }
+
+  /** get_feasibility(site_id) — TestFit-inspired development feasibility proxy (blueprint §4). */
+  async getFeasibility(siteId: string): Promise<Result<DevelopmentFeasibilityResult>> {
+    const siteResult = await this.deps.api.getSite(siteId);
+    if (!siteResult.ok) return siteResult;
+    const site = siteResult.value;
+    const projectResult = await this.deps.api.getProject(site.project_id);
+    if (!projectResult.ok) return projectResult;
+    return ok(buildDevelopmentFeasibility(site.measurements.area_sqm, projectResult.value.target_gfa_sqft));
+  }
+
+  /** get_land_economics(site_id) — blueprint §6. */
+  async getLandEconomics(siteId: string): Promise<Result<LandEconomicsResult>> {
+    const siteResult = await this.deps.api.getSite(siteId);
+    if (!siteResult.ok) return siteResult;
+    const site = siteResult.value;
+    const feasibilityResult = await this.getFeasibility(siteId);
+    if (!feasibilityResult.ok) return feasibilityResult;
+    return ok(
+      buildLandEconomics(
+        site.measurements.area_sqm,
+        site.land_price_per_acre_inr,
+        feasibilityResult.value.achievable_gfa_sqft,
+      ),
+    );
+  }
+
+  /** get_constraints(site_id) — ESRI-inspired constraints/exclusions evaluator (blueprint §3/§12). */
+  async getConstraints(siteId: string): Promise<Result<ConstraintsResult>> {
+    const analysisResult = await this.getSiteAnalysis(siteId);
+    if (!analysisResult.ok) return analysisResult;
+    const feasibilityResult = await this.getFeasibility(siteId);
+    if (!feasibilityResult.ok) return feasibilityResult;
+    const financialsResult = await this.getFinancials(siteId, "base");
+    const baseFinancials = financialsResult.ok ? financialsResult.value : null;
+    return ok(evaluateConstraints(analysisResult.value, feasibilityResult.value, baseFinancials));
+  }
+
+  /** get_data_quality(site_id) — blueprint §17. */
+  async getDataQuality(siteId: string): Promise<Result<DataQualitySummary>> {
+    const analysisResult = await this.getSiteAnalysis(siteId);
+    if (!analysisResult.ok) return analysisResult;
+    const analysis = analysisResult.value;
+    const sourceIds = new Set(analysis.metrics.map((m) => m.source.source_id).filter((id) => id !== "none"));
+    const liveSourceIds = new Set(
+      analysis.metrics.filter((m) => m.source.classification === "LIVE").map((m) => m.source.source_id),
+    );
+    return ok({
+      coverage: analysis.score?.coverage ?? analysis.run.coverage,
+      confidence: analysis.score?.confidence ?? 0,
+      source_count: sourceIds.size,
+      live_source_count: liveSourceIds.size,
+      missing_metric_count: analysis.metrics.filter((m) => m.status === "missing").length,
+      low_confidence_metric_count: analysis.metrics.filter((m) => m.status === "low_confidence" || (m.status === "ok" && m.confidence < 0.5)).length,
+    });
+  }
+
+  /** get_recommendation(site_id, thresholds?) — decision thresholds engine (blueprint §11). */
+  async getRecommendation(
+    siteId: string,
+    thresholds: DecisionThresholds = DEFAULT_DECISION_THRESHOLDS,
+  ): Promise<Result<DecisionResult>> {
+    const analysisResult = await this.getSiteAnalysis(siteId);
+    if (!analysisResult.ok) return analysisResult;
+    const constraintsResult = await this.getConstraints(siteId);
+    if (!constraintsResult.ok) return constraintsResult;
+    const financialsResult = await this.getFinancials(siteId, "base");
+    const baseFinancials = financialsResult.ok ? financialsResult.value : null;
+    const highSeverity = analysisResult.value.warnings.filter((w) => w.severity === "high").length;
+    return ok(
+      classifyDecision(analysisResult.value.score, baseFinancials, constraintsResult.value, highSeverity, thresholds),
+    );
+  }
+
+  /** get_site_insights(site_id) — Site Quick Insights (blueprint §2). */
+  async getQuickInsights(siteId: string): Promise<Result<QuickInsight[]>> {
+    const analysisResult = await this.getSiteAnalysis(siteId);
+    if (!analysisResult.ok) return analysisResult;
+    const constraintsResult = await this.getConstraints(siteId);
+    if (!constraintsResult.ok) return constraintsResult;
+    const feasibilityResult = await this.getFeasibility(siteId);
+    if (!feasibilityResult.ok) return feasibilityResult;
+    const financialsResult = await this.getFinancials(siteId, "base");
+    const baseFinancials = financialsResult.ok ? financialsResult.value : null;
+    return ok(
+      generateQuickInsights(analysisResult.value, constraintsResult.value, feasibilityResult.value, baseFinancials),
+    );
+  }
+
+  /** get_sensitivity(site_id) — deterministic IRR sensitivity sweep (blueprint §9). */
+  async getSensitivity(siteId: string): Promise<Result<Record<SensitivityDimension, SensitivityPoint[]>>> {
+    const siteResult = await this.deps.api.getSite(siteId);
+    if (!siteResult.ok) return siteResult;
+    const site = siteResult.value;
+    const projectResult = await this.deps.api.getProject(site.project_id);
+    if (!projectResult.ok) return projectResult;
+    return ok(
+      runAllSensitivities({
+        landAreaSqm: site.measurements.area_sqm,
+        landPricePerAcreInr: site.land_price_per_acre_inr,
+        targetGfaSqft: projectResult.value.target_gfa_sqft,
+      }),
+    );
+  }
+
+  /** get_break_even(site_id, dimension, target_irr_pct) — blueprint §10. */
+  async getBreakEven(
+    siteId: string,
+    dimension: SensitivityDimension,
+    targetIrrPct: number,
+  ): Promise<Result<BreakEvenResult>> {
+    const siteResult = await this.deps.api.getSite(siteId);
+    if (!siteResult.ok) return siteResult;
+    const site = siteResult.value;
+    const projectResult = await this.deps.api.getProject(site.project_id);
+    if (!projectResult.ok) return projectResult;
+    return ok(
+      findBreakEven(dimension, targetIrrPct, {
+        landAreaSqm: site.measurements.area_sqm,
+        landPricePerAcreInr: site.land_price_per_acre_inr,
+        targetGfaSqft: projectResult.value.target_gfa_sqft,
+      }),
+    );
   }
 }
