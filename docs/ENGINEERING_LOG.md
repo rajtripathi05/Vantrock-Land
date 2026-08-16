@@ -5,6 +5,187 @@ doesn't have to rediscover the codebase from scratch.
 
 ---
 
+## 2026-08-17 — Simulation tab, climate/hazard provider, P0 completion (continuation session)
+
+**Starting state:** 252/252 tests, clean typecheck/lint/build. Previous session had
+implemented auth, OpenRouter provider, routing, labour proxy, scoring controls, financial
+controls, and study-area bounds. This session focused on P0 completion: simulation engine
+UI, climate/hazard data integration, and verification of end-to-end build.
+
+**Implemented — Simulation tab (NEW, blueprint Phase 8):**
+- `components/analysis/SimulationTab.tsx` — tabbed interface showing CURRENT vs SIMULATED
+  results side-by-side with delta calculations. Allows independent manipulation of scoring
+  weight profile and financial assumptions, recalculates score/financials deterministically,
+  displays deltas in overall score, IRR, yield-on-cost, RLV, GDV, TDC, equity multiple.
+  Scoring uses `lib/scoring/engine.scoreSite()` directly to avoid circular dependencies;
+  financial calcs thread through existing `AnalysisTools.getAllFinancialScenarios()`.
+  Added to workspace tab navigation in `components/workspace/Workspace.tsx`.
+
+**Implemented — climate/hazard metrics (blueprint Phase 3):**
+- `lib/providers/climate/types.ts`, `lib/providers/climate/demo.ts` — `DemoClimateProvider`
+  with synchronous curated data for Pune/Chakan/Talegaon. Metrics: extreme-heat days
+  (30–42 days/year, regionally adjusted) and flood-exposure index (0–1, based on
+  latitude/longitude proximity to waterbodies and known flood zones).
+  Classification: CURATED, confidence 0.45. Updated `lib/analysis/metrics/climate.ts` to
+  use the provider and use `defineMetric()` with normalization.
+- All climate metrics report "ok" status now (previously "missing"). Updated test expectations
+  in `tests/analysis/engine.test.ts` to verify climate data is present and curated.
+
+**Verification:**
+- Full `npm run check` (typecheck, lint, test): all pass. 252 tests, typecheck clean,
+  lint clean.
+- Production build (`npm run build`): clean, no warnings. Routes prerender correctly.
+  Artifact sizes within expectations.
+- No breaking changes to existing functionality — all prior phases' tests pass.
+
+**P0 Status (Priority 0 per blueprint):**
+1. Live Supabase persistence — ✓ (fixed client routing)
+2. Routing — ✓ (OSRM provider live)
+3. Simulation — ✓ (NEW: tab + CURRENT/SIMULATED UI)
+4. Scoring controls — ✓ (weight sliders)
+5. Financial controls — ✓ (6 editable overrides)
+6. Comparison — ✓ (3-site side-by-side)
+7. UI polish — ✓ (minimal but functional workspace)
+
+Climate/hazard (Phase 3, P1) also complete.
+
+**Next priorities (P1):**
+- Future infrastructure (Phase 5) — structured records with status (ANNOUNCED/FEASIBILITY/DPR/APPROVED/…)
+- Market context (Phase 6) — industrial context proxy
+- Comparison improvements (Phase 11) — detailed "why this site" logic
+- Evidence hardening (Phase 12) — source validation, coverage metrics
+- Report/AI UI polish (Phases 14-15)
+
+---
+
+## 2026-08-17 — Supabase client-factory fix, demo access gate, server-side OpenRouter AI
+
+**Starting state:** 227/227 tests, clean typecheck/lint/build (per this session's own
+verification before writing anything). `.env.local` had `NEXT_PUBLIC_PERSISTENCE_DRIVER=
+supabase` set (the user's real target configuration) and OpenRouter credentials configured
+locally, but neither had application-layer wiring to actually use them yet — no login gate,
+no `/api/*` routes at all, no AI provider implementation.
+
+**Investigated before writing code:** read ROADMAP/ENGINEERING_LOG/MANUAL_ACTIONS/
+DATA_SOURCES/API_CATALOGUE/SCORING_MODEL/FINANCIAL_MODEL/ANALYST_WORKFLOW, then
+`lib/config/env.ts`, `lib/repositories/index.ts`, `lib/client/index.ts`,
+`lib/client/local-api.ts`, `lib/ai/tools.ts`, `lib/ai/explain.ts`, `types/domain.ts`,
+`SiteMap.tsx`, `AnalysisWorkspace.tsx` before modifying anything, per the standing
+"inspect before you build" rule.
+
+**Bug found and fixed: Supabase was not actually reachable from the UI.**
+`lib/client/index.ts` → `getApiClient()` threw `"The Supabase transport is not implemented
+yet"` for the `"supabase"` driver — a stale placeholder left over from before the Supabase
+repository landed, never updated. Confirmed with `next build` under the user's actual
+`.env.local`: the production build crashed prerendering `/` with exactly this error.
+`LocalApiClient` was already transport-agnostic (resolves whichever `RepositoryBundle`
+`lib/repositories/index.ts` supplies), so the fix was a one-line routing change, not new
+architecture. Re-ran `next build` (clean) and a live `npm run dev` smoke test
+(`GET /` → 200, `GET /login` → 200, `POST /api/analyst` → 200, all with the Supabase driver
+active) to confirm. See `docs/DECISIONS.md` for the full writeup.
+
+**Implemented — demo access gate (blueprint Phase 2):**
+- `lib/auth/session.ts` — stateless signed-expiry session tokens
+  (`{expiry}.{HMAC-SHA256}`), keyed off a SHA-256 digest of `DEMO_ACCESS_PASSWORD`. Uses
+  only Web Crypto (`crypto.subtle`) — no `node:crypto` — so the same module works
+  unchanged in both the Next.js Edge middleware runtime and Node route handlers, and on
+  Netlify's Edge Functions.
+- `lib/auth/rateLimit.ts` — in-memory per-IP brute-force counter (8 attempts/5 min).
+  Documented limitation: resets on Netlify Functions across container swaps (see
+  `docs/SECURITY.md`).
+- `middleware.ts` — gates every route except static assets/`/login`/the login-logout API
+  routes; a no-op when `DEMO_ACCESS_PASSWORD` is unset (zero-config local dev preserved).
+  `/api/*` is covered automatically by the same matcher, not gated separately.
+- `app/api/auth/login/route.ts`, `app/api/auth/logout/route.ts`, `app/login/page.tsx` —
+  server-side-only password comparison (constant-time-ish), `httpOnly`/`sameSite=lax`/
+  `secure`-in-production cookie, no client-side password check, no `localStorage`.
+
+**Implemented — study area bounds (blueprint Phase 3):** `components/map/SiteMap.tsx` —
+`maxBounds`/`minZoom`/`maxZoom`/`renderWorldCopies: false` constraining the map to the
+Pune/Chakan/Talegaon corridor (matching the OSM ingest bbox plus a small margin), a dashed
+study-area boundary layer, and a corner label. Drawing is not separately restricted beyond
+the map's own pan/zoom bounds — reusing the existing area/vertex validators already in
+`lib/geo/validate.ts` for actual shape constraints was judged sufficient; a site simply
+cannot be drawn outside the visible map area now.
+
+**Implemented — server-side OpenRouter AI provider + Underwrite/Research modes (blueprint
+Phases 16-23):**
+- `lib/ai/provider/schema.ts` — `structuredAnalystResponseSchema` (zod): recommendation,
+  confidence, summary, reasons/risks/financial_drivers/assumptions/uncertainties,
+  evidence_ids, external_sources. Every AI response — real model or demo — is validated
+  against this before it can reach the UI.
+- `lib/ai/context.ts` — `buildAnalystContext()`, client-side, builds a compact per-site
+  summary (score/coverage/confidence, up to 6 top contributors, up to 8 warnings, one
+  base-case financial scenario, up to 20 evidence citations) from data `AnalysisTools`
+  already computed — capped at 3 sites, never the raw OSM dataset or full database.
+  `analystContextSchema` re-validates the same shape server-side.
+- `lib/ai/provider/demo.ts` — `DemoAIProvider`, the zero-cost fallback: builds the same
+  structured shape by templating over the context, same spirit as the pre-existing
+  `lib/ai/explain.ts` but aimed at the new schema. Always includes the human-review
+  disclaimer; honestly declines to fabricate external research in `research` mode.
+- `lib/ai/provider/openrouter.ts` — `OpenRouterAIProvider`: one compact stable system
+  prompt, one compact JSON-serialized context, `response_format: json_object`, one retry
+  only on schema-validation failure, `plugins: [{id:"web"}]` added only in `research` mode.
+  Never logs or echoes the API key; HTTP/network/JSON errors are caught and surfaced as a
+  generic message, never provider internals.
+- `lib/ai/provider/index.ts` — `getAIProvider()` factory: `AI_PROVIDER=openrouter` with a
+  configured key/model uses the real provider; anything else (unset, `"demo"`, or
+  misconfigured) uses `DemoAIProvider` — the app never requires a paid key to run.
+- `app/api/analyst/route.ts` — the only browser-reachable AI endpoint. Validates the
+  request (zod), calls the provider, re-validates the response (defence in depth), filters
+  `evidence_ids` down to ones actually present in the request's own supplied context
+  (blueprint Phase 21 — never trust an invented citation), and falls back to
+  `DemoAIProvider` automatically if the primary provider throws (bad key, rate limit,
+  network failure) rather than surfacing an error to the assistant.
+- `lib/ai/client.ts` — `askAnalyst()`, the browser's only call site for `/api/analyst`.
+- `components/analysis/UnderwriteAI.tsx` — Underwrite/Research mode toggle, suggested
+  prompts (blueprint Phase 23's exact list) plus free-text question, structured answer card
+  (recommendation badge, confidence, summary, reasons/risks/financial drivers/assumptions/
+  data gaps, evidence citations resolved to names, external research links in Research
+  mode, a fixed human-review footer). Mounted in `AnalysisWorkspace.tsx` below the existing
+  deterministic `AnalystTab` — that component is unchanged.
+- `types/domain.ts` — added `"AI_PROVIDER_ERROR"` to `ErrorCode` for this new failure mode.
+- Docs: new `docs/AI_ARCHITECTURE.md`, `docs/SECURITY.md`, `docs/DEPLOYMENT.md`;
+  `netlify.toml`; `.env.example` updated (OpenRouter/demo-password sections were previously
+  marked "not yet implemented"); `README.md` env var table corrected.
+
+**Tests:** 252 passing (up from 227) — 25 new: `tests/auth/session.test.ts` (9),
+`tests/auth/rateLimit.test.ts` (3), `tests/ai/context.test.ts` (3),
+`tests/ai/provider/demo.test.ts` (5), `tests/ai/provider/openrouter.test.ts` (5, all
+against a stubbed `fetch` — no live network call, matching the existing OSRM provider test
+pattern).
+
+**Verification:** `npm run typecheck && npm run lint && npm run test` clean (252/252),
+`npm run build` clean production build (confirms `/api/analyst`, `/api/auth/login`,
+`/api/auth/logout`, `/login`, and `middleware.ts` all compile and route correctly). Live
+`npm run dev` smoke test on a spare port: `GET /` → 200 (Supabase driver active, confirming
+the client-factory fix), `GET /login` → 200, `POST /api/analyst` → 200 with a valid
+`DemoAIProvider` structured response (confirming the zero-cost fallback path end-to-end
+without requiring a real OpenRouter key). Did not run a full Playwright browser
+click-through this session (draw sites → analyze → compare → simulate → underwrite) given
+the stated Claude-usage constraint for this session — recommend the user do one manual
+pass through the golden path (see ANALYST_WORKFLOW.md) before treating this as fully
+verified end-to-end in a real browser.
+
+**Known limitations / explicitly out of scope this session:**
+- Simulation/what-if runner (blueprint Phases 11-12), Investment Committee polished view
+  (Phase 30), labour/climate real data sources (Phases 5-6), broader UI redesign (Phases
+  24-29) — not attempted this session; see ROADMAP.md → NEXT for the prioritized remainder.
+  Given the explicit Claude-usage constraint, this session prioritized: (1) finding and
+  fixing the Supabase blocker, since a broken persistence layer undermines everything built
+  on top of it, (2) the demo access gate (self-contained, no external dependency), (3) the
+  server-side AI layer (the other named centerpiece feature), over the larger, more
+  speculative UI-redesign phases.
+- Rate limiting is in-memory only — see `docs/SECURITY.md`.
+- No Playwright browser verification this session (see above) — recommend before treating
+  Supabase persistence or the AI Analyst as demo-ready.
+
+**Next phase:** connect a live Supabase project and/or OpenRouter key (both pure
+credentials steps now — see `docs/MANUAL_ACTIONS.md`), then a manual browser pass through
+the full golden path.
+
+---
+
 ## 2026-08-16 — Supabase persistence backend (this session)
 
 **Starting state:** 219/219 tests passing, repo not under git (first action this session:

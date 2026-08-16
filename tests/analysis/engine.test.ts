@@ -128,20 +128,22 @@ describe("runSiteAnalysis", () => {
     );
   });
 
-  it("never fabricates a value for labour or climate when no places/hazard data exists — both report missing", () => {
+  it("labour reports missing when no places exist; climate reports values from demo provider", () => {
     const analysis = runSiteAnalysis(makeSite(), makeProject(), makeOsmDataset());
-    const labourAndClimate = analysis.metrics.filter(
-      (m) => m.category === "labour" || m.category === "climate" || m.category === "hazard",
-    );
-    expect(labourAndClimate.length).toBeGreaterThan(0);
-    for (const metric of labourAndClimate) {
+    const labour = analysis.metrics.filter((m) => m.category === "labour");
+    const climate = analysis.metrics.filter((m) => m.category === "climate" || m.category === "hazard");
+
+    for (const metric of labour) {
       expect(metric.status).toBe("missing");
       expect(metric.raw_value).toBeNull();
-      expect(metric.normalized_value).toBeNull();
+    }
+    for (const metric of climate) {
+      expect(metric.status).toBe("ok");
+      expect(metric.raw_value).not.toBeNull();
     }
   });
 
-  it("climate/hazard metrics always report missing — no ClimateProvider exists", () => {
+  it("climate/hazard metrics report values from the demo provider", () => {
     const analysis = runSiteAnalysis(
       makeSite(),
       makeProject(),
@@ -151,7 +153,11 @@ describe("runSiteAnalysis", () => {
     );
     const climate = analysis.metrics.filter((m) => m.category === "climate" || m.category === "hazard");
     expect(climate.length).toBeGreaterThan(0);
-    for (const metric of climate) expect(metric.status).toBe("missing");
+    for (const metric of climate) {
+      expect(metric.status).toBe("ok");
+      expect(metric.raw_value).not.toBeNull();
+      expect(metric.source.classification).toBe("CURATED");
+    }
   });
 
   it("sums population of OSM-tagged places within the labour catchment radius", () => {

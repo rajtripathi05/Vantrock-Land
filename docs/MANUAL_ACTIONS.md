@@ -57,9 +57,18 @@ infrastructure metrics for a site in the corridor.
 **Why:** as of the Supabase integration phase, `lib/repositories/supabase/` fully
 implements `RepositoryBundle` (projects + sites) against Postgres/PostGIS via
 `@supabase/supabase-js`, and `supabase/migrations/0001_init.sql` defines the schema.
-`lib/repositories/index.ts` now routes the `"supabase"` driver to it — no engineering work
-remains, only a real Supabase project and its credentials, which this session cannot create
-on your behalf (no account access).
+`lib/repositories/index.ts` routes the `"supabase"` driver to it.
+
+**Bug found and fixed this session:** `lib/client/index.ts` — the factory the UI actually
+calls (`getApiClient()`) — still threw `"The Supabase transport is not implemented yet"`
+for the `"supabase"` driver, even though the repository layer underneath it was complete.
+`LocalApiClient` is transport-agnostic despite its name (it resolves whichever
+`RepositoryBundle` `lib/repositories/index.ts` hands it, IndexedDB or Supabase, and calls
+the same service functions either way) — the factory just needed to route `"supabase"` to
+it instead of throwing. Fixed; confirmed with a `next build` (no more prerender crash on
+`NEXT_PUBLIC_PERSISTENCE_DRIVER=supabase`) and a live dev-server smoke test (`GET /` → 200
+with the Supabase driver active). This means the steps below are now genuinely a
+credentials-only step, not an engineering-plus-credentials one.
 
 **Exact steps:**
 1. Open the [Supabase Dashboard](https://supabase.com/dashboard) and either open your
@@ -112,39 +121,86 @@ them first, then a migration, following the same pattern as this one.
 
 ## PRIORITY 2 — OPTIONAL
 
-### Action: Configure a real LLM provider for the Analyst tab
+### Action: Set the demo access password (recommended before sharing any URL)
 
-**Why:** the Analyst tab is currently fully deterministic (template-based, `lib/ai/`) and
-requires no API key at all — this is by design, not a placeholder waiting on a key (see
-`docs/DECISIONS.md`). Only do this if you specifically want model-generated prose *in
-addition to* the deterministic tool outputs.
+**Why:** `middleware.ts` + `app/api/auth/login/route.ts` implement a server-side password
+gate (HTTP-only signed session cookie, no client-side check, no `localStorage`) — see
+`docs/SECURITY.md`. If `DEMO_ACCESS_PASSWORD` is unset, the gate is a no-op (local dev runs
+with zero configuration, as always). Set it before sharing any deployed URL.
 
-**Where to get a key:** https://console.anthropic.com (Anthropic API keys — the "Claude
-Pro" subscription does **not** include API credits; API usage is billed separately).
+**Exact steps:**
+1. Add to `.env.local` (local) or the hosting platform's environment variable UI
+   (deployed):
+   ```
+   DEMO_ACCESS_PASSWORD=<choose a password>
+   ```
+2. Restart `npm run dev`, or redeploy.
 
-**Exact environment variable name:** not yet defined in this codebase — a future session
-adding this integration should introduce `ANTHROPIC_API_KEY` (server-only — never
-`NEXT_PUBLIC_ANTHROPIC_API_KEY`, since that would ship the key to every browser).
+**Security warning:** server-only. Never `NEXT_PUBLIC_DEMO_ACCESS_PASSWORD`. Never log it,
+never commit it.
 
-**What `.env.local` line to add:**
+**Test command:** `npm run dev`, visit `/`, confirm you're redirected to `/login`; enter
+the password; confirm you land back on `/` with a `vantrock_session` cookie set
+(`httpOnly`, inspectable in DevTools → Application → Cookies, but not readable from a
+`document.cookie` console call).
+
+**Done when:** an unauthenticated visit to `/` (or any `/api/*` route) redirects to
+`/login` (or returns 401 for API calls) until the correct password is entered.
+
+- [ ] Set `DEMO_ACCESS_PASSWORD` in every environment where this app is reachable by anyone
+      other than you
+
+---
+
+### Action: Configure OpenRouter for the AI Analyst (Underwrite / Research modes)
+
+**Why:** `app/api/analyst/route.ts` + `lib/ai/provider/openrouter.ts` implement a real,
+server-side, structured-output AI analyst (see `docs/AI_ARCHITECTURE.md`). It is entirely
+optional — `AI_PROVIDER` unset (or `"demo"`) runs the deterministic demo provider with zero
+cost and zero API key, and the app never requires this to function. Only do this if you
+want real model-generated reasoning in addition to the always-available deterministic
+Analyst tab.
+
+**Where to get a key:** https://openrouter.ai/keys (OpenRouter account required; the brief's
+$5-10 testing budget applies here — OpenRouter shows per-request cost in its dashboard).
+
+**What `.env.local` line to add (local) or set in the hosting platform's environment
+variable UI (deployed):**
 ```
-ANTHROPIC_API_KEY=sk-ant-...
+AI_PROVIDER=openrouter
+OPENROUTER_API_KEY=sk-or-...
+OPENROUTER_MODEL=<a model slug from https://openrouter.ai/models, e.g. anthropic/claude-3.5-haiku>
+OPENROUTER_MAX_TOKENS=900
+OPENROUTER_TEMPERATURE=0.2
 ```
 
-**Whether it belongs in browser or server:** **server only.** It must never be prefixed
-`NEXT_PUBLIC_` and must never be imported into any file under `app/` that runs in the
-browser. It would need a Next.js Route Handler (server-side) to keep it off the client.
+**Whether it belongs in browser or server:** **server only.** `OPENROUTER_API_KEY` is read
+exclusively in `lib/ai/provider/openrouter.ts`, imported only from
+`app/api/analyst/route.ts`. Never prefix any of these with `NEXT_PUBLIC_`.
 
-**Security warning:** never commit this key. `.env.local` is already gitignored — verify
-with `git check-ignore .env.local` before committing anything.
+**Security warning:** never commit the key. `.env.local` is already gitignored — verify
+with `git check-ignore .env.local`. If the key is missing/invalid, or the live call fails
+for any reason, the app automatically falls back to the deterministic demo provider for
+that request rather than erroring — see `docs/AI_ARCHITECTURE.md` → "Provider fallback."
 
-**Test command:** none yet — this integration doesn't exist in the codebase. Implementing
-it is an engineering task (see `docs/API_CATALOGUE.md` → "Anthropic / LLM API").
+**Test command:** `npm run dev`, open a project with at least one analyzed site, go to the
+Analyst tab, use the "AI Analyst" section below the deterministic questions, click any
+suggested prompt. Response should render with `provider: "openrouter"` (visible in the
+answer card's byline) instead of `"demo"`.
 
-**Done when:** not applicable until the integration is built.
+**Model choice — cost note:** a small/cheap model (e.g. a Haiku-class or similarly-priced
+model on OpenRouter) is sufficient for this MVP's structured-output task and keeps the
+$5-10 budget comfortable across many test questions. Research mode (`plugins: [{id:"web"}]`)
+costs more per call than Underwrite mode — test it more sparingly.
 
-- [ ] Obtained an Anthropic API key
-- [ ] (Engineering task, not yet done) Implemented a server-side route handler that uses it
+**Done when:** the answer card in the Analyst tab shows `provider: "openrouter"` for a
+question, not `"demo"`.
+
+- [ ] Obtained an OpenRouter API key
+- [ ] Chose a model slug and set `OPENROUTER_MODEL`
+- [ ] Set `AI_PROVIDER=openrouter`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` in every
+      environment where real AI responses (vs. the deterministic demo provider) are wanted
+- [ ] Verified: the Analyst tab's AI Analyst section shows `provider: "openrouter"`
 
 ---
 

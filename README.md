@@ -94,10 +94,12 @@ and `docs/MANUAL_ACTIONS.md` if you need to change the persistence driver or bas
 
 | Variable | Values | Default | Notes |
 |---|---|---|---|
-| `NEXT_PUBLIC_PERSISTENCE_DRIVER` | `indexeddb` \| `supabase` | `indexeddb` | `supabase` is not implemented yet and throws a clear error if set. |
+| `NEXT_PUBLIC_PERSISTENCE_DRIVER` | `indexeddb` \| `supabase` | `indexeddb` | `supabase` requires `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY` and the migration in `supabase/migrations/` to have been run — see `docs/MANUAL_ACTIONS.md`. |
 | `NEXT_PUBLIC_BASEMAP` | `osm-dev` \| `blank` | `osm-dev` | `osm-dev` uses OpenStreetMap raster tiles — development only, not licensed for production. |
+| `DEMO_ACCESS_PASSWORD` | any string | unset | Server-side only. Unset = no login gate (local dev). Set in any deployed environment. |
+| `AI_PROVIDER` | `demo` \| `openrouter` | `demo` | `openrouter` requires `OPENROUTER_API_KEY`/`OPENROUTER_MODEL`; falls back to `demo` (no key required) if either is missing. |
 
-No API keys, no secrets, in this MVP.
+No API keys are required to run this MVP locally. See `docs/SECURITY.md` for what's server-only and `docs/AI_ARCHITECTURE.md` for the AI provider contract.
 
 ## Current data sources
 

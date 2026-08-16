@@ -123,7 +123,36 @@ Actual Vantrock milestones, not generic software tasks.
   quality (88.8% vs 100.0%)", IRR/equity multiple rows rendered (showing "—" with an
   explanatory hint for sites with no land price entered), zero console errors. 11 new
   tests (5 for `categoryPerformance`, 6 for `explainWhyNot`).
-- **227 automated tests, 0 lint errors, 0 type errors, clean production build.**
+- **Supabase client-factory bug fix (2026-08-17)** — `lib/client/index.ts` was throwing
+  `"The Supabase transport is not implemented yet"` for `NEXT_PUBLIC_PERSISTENCE_DRIVER=
+  supabase` even though the repository layer was complete; fixed to route through the same
+  transport-agnostic `LocalApiClient` as IndexedDB. This was the actual remaining blocker
+  on live Supabase persistence, not just credentials. See DECISIONS.md.
+- **Demo access gate (2026-08-17)** — `middleware.ts` + `app/api/auth/login|logout` +
+  `/login` page. Signed, stateless, HTTP-only session cookie (`lib/auth/session.ts`, Web
+  Crypto HMAC-SHA256, no session store needed), in-memory brute-force rate limiting
+  (`lib/auth/rateLimit.ts`), gate is a no-op when `DEMO_ACCESS_PASSWORD` is unset. Covers
+  every route including `/api/*` automatically via the middleware matcher. 12 new tests.
+- **Study area map bounds (2026-08-17)** — `SiteMap.tsx` now constrains the MapLibre
+  instance to the Pune/Chakan/Talegaon corridor (`maxBounds`, `minZoom`/`maxZoom`,
+  `renderWorldCopies: false`) matching the OSM ingest bounding box plus a small margin, with
+  a dashed study-area boundary overlay and a corner label. No more world map / wrapping.
+- **Server-side OpenRouter AI provider + Underwrite/Research modes (2026-08-17)** —
+  `lib/ai/provider/` (`AIProvider` interface, `OpenRouterAIProvider`, `DemoAIProvider`),
+  `app/api/analyst/route.ts` (the only browser-reachable AI endpoint; the middleware gate
+  above covers it automatically), `lib/ai/context.ts` (compact, capped context built
+  client-side from already-computed `AnalysisTools` output — never the raw OSM dataset or
+  full database), `lib/ai/client.ts` (`askAnalyst()`), `UnderwriteAI.tsx` (mode toggle,
+  suggested prompts, structured answer card — additive alongside the existing deterministic
+  Analyst tab, which is unchanged). Every response validated against
+  `structuredAnalystResponseSchema` (zod) before rendering; invented `evidence_ids` are
+  filtered server-side; a failed/misconfigured OpenRouter call falls back to the
+  deterministic demo provider automatically rather than blocking the assistant. Defaults to
+  the zero-cost demo provider until `AI_PROVIDER=openrouter` + a key are configured — see
+  `docs/AI_ARCHITECTURE.md`, `docs/MANUAL_ACTIONS.md`. 22 new tests (session tokens, rate
+  limiting, context building, demo provider, OpenRouter provider against a stubbed fetch —
+  no live network call in the test suite).
+- **252 automated tests, 0 lint errors, 0 type errors, clean production build.**
 - **Supabase persistence backend (engineering complete, 2026-08-16)** —
   `lib/repositories/supabase/` fully implements `RepositoryBundle` (projects + sites)
   against Postgres/PostGIS, `supabase/migrations/0001_init.sql` defines the schema
@@ -139,30 +168,42 @@ None right now.
 
 ## NEXT
 
-1. **Connect a live Supabase project** — manual boundary; see `docs/MANUAL_ACTIONS.md`.
-   Everything else in this list can proceed without it.
-2. **Server-side demo access gate** — password-protected session cookie in front of the
-   whole app, per the product brief. No Supabase/OpenRouter dependency.
-3. **Financial assumption override UI controls** — already landed, see COMPLETE → Phase 8.
-4. **Sector-specific labour data source** — `labour.population_proxy` is real now (Phase
+1. **Connect a live Supabase project** — manual, credentials-only boundary; see
+   `docs/MANUAL_ACTIONS.md`. The blocking client-factory bug (`lib/client/index.ts` threw
+   for the `"supabase"` driver) is fixed as of this session — see ENGINEERING_LOG.md and
+   DECISIONS.md.
+2. **Configure OpenRouter** — optional, credentials-only; the real AI layer
+   (`lib/ai/provider/`, Underwrite/Research modes) is implemented and defaults to a
+   zero-cost deterministic fallback until `AI_PROVIDER=openrouter` + a key are set. See
+   `docs/MANUAL_ACTIONS.md`.
+3. **Sector-specific labour data source** — `labour.population_proxy` is real now (Phase
    2); `labour.labour_proxy` still needs an actual labour-market dataset (PLFS district
    data is the leading free candidate) to move beyond permanently missing.
-5. **Climate/hazard data source** — India-WRIS flood layers or Bhuvan hazard atlas.
-6. **Weight-profile persistence** — the interactive sliders (Phase 7) are in-memory per
+4. **Climate/hazard data source** — India-WRIS flood layers or Bhuvan hazard atlas.
+5. **Weight-profile persistence** — the interactive sliders (Phase 7) are in-memory per
    session; persisting a custom profile per project would need a new repository method
    (Supabase-backed now that the backend exists) following the pattern in
    `lib/repositories/`.
-7. **Self-hosted OSRM** — the public demo server used for Phase 1 routing is free but
+6. **Self-hosted OSRM** — the public demo server used for Phase 1 routing is free but
    explicitly light-use-only; a production deployment should self-host OSRM (see
    `docs/MANUAL_ACTIONS.md`) and swap `lib/providers/routing/osrm.ts`'s base URL. The
    interface does not change.
-8. **Broader population coverage** — only 5 settlement nodes in the corridor carry a
+7. **Broader population coverage** — only 5 settlement nodes in the corridor carry a
    usable OSM population tag today; a Census of India town/village table (downloaded, not
    live) would widen coverage well beyond OSM's sparse tagging without changing the
    `labour.population_proxy` metric shape, just its source.
-9. **Server-side OpenRouter provider** — real LLM-backed analyst (Underwrite + Research
-   modes), needs `OPENROUTER_API_KEY` — see `docs/MANUAL_ACTIONS.md`.
-10. **Netlify deployment prep** — `.env.example` already documents the target variable set.
+8. **Simulation / what-if scenario runner (Phases 11-12 of the product brief)** — a
+   dedicated "Run Simulation" flow comparing CURRENT vs. SIMULATED vs. DELTA across score,
+   ranking, and financial outputs for adjusted assumptions/weights in one action. The
+   underlying pieces (weight sliders, financial overrides, comparison) all exist
+   independently today; this is a new UI that runs them together and diffs the result —
+   not yet built.
+9. **Investment Committee polished view (Phase 30)** — the Report tab's Investment Summary
+   already covers most of this (recommendation, strengths/risks, financials, comparison,
+   coverage, limitations); a dedicated multi-section IC layout with explicit
+   PURSUE/HOLD/REJECT framing is a further UI pass, not yet built.
+10. **Shared-store rate limiting for the demo login gate** — see `docs/SECURITY.md` for the
+    current in-memory limitation on serverless platforms.
 
 ## LATER
 

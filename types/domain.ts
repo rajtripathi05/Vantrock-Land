@@ -269,7 +269,8 @@ export type ErrorCode =
   | "VERTEX_COUNT_OUT_OF_BOUNDS"
   | "NOT_FOUND"
   | "STORAGE_UNAVAILABLE"
-  | "NOT_IMPLEMENTED";
+  | "NOT_IMPLEMENTED"
+  | "AI_PROVIDER_ERROR";
 
 export interface AppError {
   code: ErrorCode;

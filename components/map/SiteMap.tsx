@@ -50,6 +50,19 @@ const TOOL_TO_MODE: Record<DrawTool, string> = {
 const SITES_SOURCE = "vantrock-sites";
 const ANCHORS_SOURCE = "vantrock-anchors";
 
+/**
+ * Study area: Pune / Chakan / Talegaon corridor. Matches the OSM ingest
+ * bounding box (ingest/sources/osm/fetch.mjs) plus a small margin so the
+ * analyst can see just past the ingested edge rather than hit a hard wall
+ * exactly at the data boundary. [west, south, east, north].
+ */
+const STUDY_AREA_BOUNDS: [[number, number], [number, number]] = [
+  [73.4, 18.3],
+  [74.2, 19.0],
+];
+const STUDY_AREA_MIN_ZOOM = 9;
+const STUDY_AREA_MAX_ZOOM = 18;
+
 export interface SiteMapProps {
   sites: Site[];
   selectedSiteId: string | null;
@@ -107,6 +120,14 @@ export function SiteMap({
       // The analyst is reading a plan, not flying a camera.
       pitchWithRotate: false,
       dragRotate: false,
+      // This MVP's data (OSM ingest, scoring, financial defaults) is all
+      // scoped to the Pune/Chakan/Talegaon corridor — the map should not
+      // wander (or wrap the world) past it. Widening to a new geography
+      // means widening this bbox alongside a new OSM ingest, not removing it.
+      maxBounds: STUDY_AREA_BOUNDS,
+      minZoom: STUDY_AREA_MIN_ZOOM,
+      maxZoom: STUDY_AREA_MAX_ZOOM,
+      renderWorldCopies: false,
     });
     mapRef.current = map;
 
@@ -335,6 +356,55 @@ export function SiteMap({
     };
   }, [sites, selectedSiteId, mapLoaded]);
 
+  // --------------------------------------------------- study area boundary
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+
+    const [[west, south], [east, north]] = STUDY_AREA_BOUNDS;
+    const boundary: GeoJSON.Feature<GeoJSON.Polygon> = {
+      type: "Feature",
+      properties: {},
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [west, south],
+            [east, south],
+            [east, north],
+            [west, north],
+            [west, south],
+          ],
+        ],
+      },
+    };
+
+    const render = () => {
+      if (!map.isStyleLoaded()) return;
+      if (!map.getSource("vantrock-study-area")) {
+        map.addSource("vantrock-study-area", { type: "geojson", data: boundary });
+      }
+      if (!map.getLayer("study-area-line")) {
+        map.addLayer({
+          id: "study-area-line",
+          type: "line",
+          source: "vantrock-study-area",
+          paint: {
+            "line-color": "#4c5a6b",
+            "line-width": 1.5,
+            "line-dasharray": [3, 2],
+          },
+        });
+      }
+    };
+
+    render();
+    map.on("styledata", render);
+    return () => {
+      map.off("styledata", render);
+    };
+  }, [mapLoaded]);
+
   // ------------------------------------------------- reference anchor layer
   useEffect(() => {
     const map = mapRef.current;
@@ -414,6 +484,13 @@ export function SiteMap({
   return (
     <>
       <div ref={containerRef} className="map-canvas" />
+
+      <div className="map-overlay map-overlay-top-left">
+        <div className="map-scale-readout">
+          <span>PUNE / CHAKAN / TALEGAON</span>
+          <span className="muted">study area</span>
+        </div>
+      </div>
 
       <div className="map-overlay map-overlay-bottom-left">
         <div className="map-scale-readout">

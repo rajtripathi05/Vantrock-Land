@@ -1,9 +1,14 @@
 /**
  * ApiClient factory — the single place the UI obtains its data access.
  *
- * When the Supabase slice lands this gains an HttpApiClient branch selected by
- * the persistence driver. Components keep calling useApi() and never learn
- * that the calls started crossing a network.
+ * LocalApiClient is transport-agnostic despite its name: it resolves a
+ * RepositoryBundle via lib/repositories/index.ts (which already routes
+ * "indexeddb" and "supabase" to their respective implementations) and calls
+ * the same service functions either way. The Supabase JS client is safe to
+ * run directly in the browser — it uses the anon key, constrained by RLS —
+ * so no separate HttpApiClient/server round trip is needed for this MVP's
+ * single-tenant-behind-a-password-gate posture. Components keep calling
+ * getApiClient() and never learn which backend answered.
  */
 
 import { getPersistenceDriver } from "@/lib/config/env";
@@ -18,13 +23,9 @@ export function getApiClient(): ApiClient {
   const driver = getPersistenceDriver();
   switch (driver) {
     case "indexeddb":
+    case "supabase":
       client = new LocalApiClient();
       return client;
-    case "supabase":
-      // Will become: client = new HttpApiClient("/api")
-      throw new Error(
-        "The Supabase transport is not implemented yet. Set NEXT_PUBLIC_PERSISTENCE_DRIVER=indexeddb.",
-      );
     default: {
       const exhaustive: never = driver;
       throw new Error(`Unknown persistence driver: ${String(exhaustive)}`);

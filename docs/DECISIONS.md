@@ -176,6 +176,50 @@ technically be produced; the bar is whether the number means what its label clai
 missing; the other stays honestly missing until a real labour-market dataset (e.g. PLFS
 district data) is integrated — see `docs/ROADMAP.md` → NEXT.
 
+## Supabase client factory bug: `getApiClient()` threw for the `"supabase"` driver despite the repository layer being complete
+
+**Decision (2026-08-17):** `lib/client/index.ts` now routes `"supabase"` to the same
+`LocalApiClient` as `"indexeddb"`, instead of throwing `"The Supabase transport is not
+implemented yet."`.
+**Why:** `LocalApiClient` was already transport-agnostic — its constructor resolves a
+`RepositoryBundle` via `lib/repositories/index.ts`, which already routed `"supabase"` to
+`createSupabaseRepositories()` correctly. The factory's switch statement just never got
+updated when the Supabase repository landed; it still had a stale placeholder throw left
+over from before that work, plus a comment implying a future `HttpApiClient` was needed.
+That extra HTTP hop isn't actually necessary for this MVP's posture: the Supabase JS client
+is safe to run directly in the browser (anon key, constrained by RLS), the same way the
+IndexedDB repository always has. Found by running `next build` with
+`NEXT_PUBLIC_PERSISTENCE_DRIVER=supabase` set (the user's actual configured environment) —
+the production build failed prerendering `/` with exactly this thrown error.
+**Impact:** this was the actual blocker on "Connect Supabase" being a credentials-only step
+as ENGINEERING_LOG.md's prior entry claimed — the repository layer was real and tested, but
+nothing in the UI could ever reach it. Fixed; confirmed with a clean `next build` and a
+live dev-server smoke test (`GET /` → 200, `NEXT_PUBLIC_PERSISTENCE_DRIVER=supabase`
+active). No `HttpApiClient` was written — not needed for the reason above, and adding one
+would be speculative architecture ahead of an actual requirement for it (e.g. a privileged
+server-side Supabase operation, which does not exist in this codebase).
+
+## Server-side OpenRouter as an additive second AI surface, not a replacement
+
+**Decision (2026-08-17):** `lib/ai/provider/` (OpenRouter + demo implementations of one
+`AIProvider` interface) and `app/api/analyst/route.ts` add "Underwrite" and "Research"
+modes (`UnderwriteAI.tsx`) alongside the existing deterministic canned-question assistant
+(`lib/ai/explain.ts`, `AnalystTab.tsx`) — the latter is unchanged, still zero-cost, still
+requires no key.
+**Why:** the original "evidence-first, deterministic AI layer" decision (above) was made
+when no API key was available; the brief for this phase provides a real OpenRouter budget
+($5-10) and explicitly asks for a real model layer. Keeping the deterministic assistant
+alongside it (rather than replacing it) preserves a zero-cost, always-available fallback
+path and matches the instruction to never let a missing/invalid key block the deterministic
+application.
+**Impact:** the AI context sent to the model is built client-side, from data
+`AnalysisTools` already computed (see `docs/AI_ARCHITECTURE.md` for why this doesn't need a
+second server-side recomputation), capped at 3 sites / 6 contributors / 8 warnings / 20
+evidence citations per site — never the raw OSM dataset or full database. Every response
+(real model or demo fallback) is validated against the same zod schema before reaching the
+UI, and returned `evidence_ids` are filtered against the request's own supplied evidence
+list so an invented citation can never render as real.
+
 ## Pune / Chakan / Talegaon geography, Grade-A logistics use case
 
 **Decision:** the OSM ingestion bounding box, the default weight profile, the financial

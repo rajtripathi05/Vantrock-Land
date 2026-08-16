@@ -48,6 +48,7 @@ const MAIN_TABS: Array<{ id: MainTab; label: string }> = [
   { id: "analysis", label: "Analysis" },
   { id: "compare", label: "Compare" },
   { id: "financials", label: "Financials" },
+  { id: "simulation", label: "Simulation" },
   { id: "evidence", label: "Evidence" },
   { id: "analyst", label: "Analyst" },
   { id: "report", label: "Report" },

@@ -112,10 +112,23 @@ future session implements against a documented contract rather than guessing.
 - **Purpose:** site elevation / grading cost proxy.
 - **MVP status:** NOT IMPLEMENTED. Not prioritized for the current metric set.
 
-## Anthropic / LLM API
+### OpenRouter (server-side AI — Underwrite / Research modes)
 
-**Not used anywhere in this MVP.** The Analyst tab (`components/analysis/AnalystTab.tsx`,
-`lib/ai/explain.ts`) is fully deterministic and template-based — see `docs/DECISIONS.md`
-for why. If a real model provider is configured in a future session, `docs/MANUAL_ACTIONS.md`
-is where the exact steps (API key, environment variable, security warning) belong — none of
-which apply yet because no such integration exists in this codebase.
+| Field | Value |
+|---|---|
+| Provider | OpenRouter (proxies many underlying model providers behind one API) |
+| Endpoint | `POST https://openrouter.ai/api/v1/chat/completions` |
+| Authentication | `OPENROUTER_API_KEY` — server-only, never sent to the browser |
+| Purpose | Structured reasoning over already-computed site analysis/score/comparison/financials (Underwrite mode); optionally live web search for current external context (Research mode, via `plugins: [{id:"web"}]`) |
+| Input | Compact JSON context (`lib/ai/context.ts`) — never the raw OSM dataset or full database |
+| Output | A single structured JSON object, validated by `structuredAnalystResponseSchema` (`lib/ai/provider/schema.ts`) |
+| Free/paid | Paid, per-token — this MVP targets a $5-10 total test budget (see `docs/AI_ARCHITECTURE.md` → "Cost controls") |
+| MVP status | **Implemented, optional.** `AI_PROVIDER` unset/`"demo"` (the default) never calls this endpoint at all — the deterministic `DemoAIProvider` answers instead, at zero cost and with no key required. |
+| Fallback | Missing/invalid key or model → `DemoAIProvider` at provider-selection time. A live call that fails (network, HTTP error, timeout, twice-invalid JSON) → `DemoAIProvider` for that one request, inside `app/api/analyst/route.ts`. The deterministic app is never blocked by this endpoint being unavailable. |
+| Environment variables | `AI_PROVIDER`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_MAX_TOKENS`, `OPENROUTER_TEMPERATURE` — see `docs/MANUAL_ACTIONS.md` for exact setup steps. |
+| Where it plugs in | `lib/ai/provider/openrouter.ts`, called only from `app/api/analyst/route.ts`. See `docs/AI_ARCHITECTURE.md` for the full request flow. |
+
+Older note (still true, unchanged by this): the deterministic canned-question Analyst
+assistant (`components/analysis/AnalystTab.tsx`, `lib/ai/explain.ts`) remains fully
+template-based, no API key, no network call — see `docs/DECISIONS.md`. OpenRouter is an
+additive second surface (`UnderwriteAI.tsx`), not a replacement.

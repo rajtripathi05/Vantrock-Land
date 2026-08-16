@@ -15,11 +15,13 @@ import { WEIGHT_PROFILES, DEFAULT_WEIGHT_PROFILE, type WeightProfile } from "@/l
 import { AnalysisTab } from "./AnalysisTab";
 import { CompareTab } from "./CompareTab";
 import { FinancialsTab } from "./FinancialsTab";
+import { SimulationTab } from "./SimulationTab";
 import { EvidenceTab } from "./EvidenceTab";
 import { AnalystTab } from "./AnalystTab";
+import { UnderwriteAI } from "./UnderwriteAI";
 import { InvestmentSummary } from "@/components/report/InvestmentSummary";
 
-export type AnalysisMainTab = "analysis" | "compare" | "financials" | "evidence" | "analyst" | "report";
+export type AnalysisMainTab = "analysis" | "compare" | "financials" | "simulation" | "evidence" | "analyst" | "report";
 
 export function AnalysisWorkspace({
   project,
@@ -129,8 +131,20 @@ export function AnalysisWorkspace({
       ) : null}
       {tab === "compare" ? <CompareTab analyses={analysisList} tools={tools} /> : null}
       {tab === "financials" ? <FinancialsTab site={selectedSite} tools={tools} /> : null}
+      {tab === "simulation" ? <SimulationTab site={selectedSite} analysis={selectedAnalysis} tools={tools} /> : null}
       {tab === "evidence" ? <EvidenceTab site={selectedSite} analysis={selectedAnalysis} /> : null}
-      {tab === "analyst" ? <AnalystTab analyses={analysisList} selectedSiteId={selectedSiteId} /> : null}
+      {tab === "analyst" ? (
+        <>
+          <AnalystTab analyses={analysisList} selectedSiteId={selectedSiteId} />
+          <UnderwriteAI
+            project={project}
+            tools={tools}
+            analyses={analysisList}
+            selectedSiteId={selectedSiteId}
+            weightProfileName={activeProfile.name}
+          />
+        </>
+      ) : null}
       {tab === "report" ? <InvestmentSummary project={project} analyses={analysisList} /> : null}
     </div>
   );

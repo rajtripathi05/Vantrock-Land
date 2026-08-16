@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Server-only secrets (DEMO_ACCESS_PASSWORD, OPENROUTER_API_KEY, SUPABASE_SECRET_KEY
+# if one is ever added) are set in the Netlify UI (Site configuration -> Environment
+# variables), never here. This file has no [build.environment] secrets on purpose —
+# see docs/SECURITY.md and docs/DEPLOYMENT.md.
