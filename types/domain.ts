@@ -182,7 +182,8 @@ export type MetricCategory =
   | "market"
   | "labour"
   | "climate"
-  | "hazard";
+  | "hazard"
+  | "infrastructure_future";
 
 export type MetricDirection = "benefit" | "cost" | "neutral";
 

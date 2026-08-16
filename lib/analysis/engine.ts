@@ -24,6 +24,7 @@ import { buildMarketMetrics } from "./metrics/market";
 import { buildInfrastructureMetrics } from "./metrics/infrastructure";
 import { buildLabourMetrics } from "./metrics/labour";
 import { buildClimateMetrics } from "./metrics/climate";
+import { buildFutureInfrastructureMetrics } from "./metrics/future-infrastructure";
 
 export const ANALYSIS_ENGINE_VERSION = "vantrock-analysis@0.1.0";
 
@@ -78,6 +79,7 @@ export function runSiteAnalysis(
     ...buildInfrastructureMetrics(site, osm),
     ...buildLabourMetrics(site, osm),
     ...buildClimateMetrics(site),
+    ...buildFutureInfrastructureMetrics(site),
   ];
 
   const okCount = metrics.filter((metric) => metric.status === "ok").length;

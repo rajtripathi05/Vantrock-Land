@@ -24,6 +24,7 @@ const CATEGORY_LABELS: Record<MetricCategory, string> = {
   labour: "Labour",
   climate: "Climate",
   hazard: "Hazard",
+  infrastructure_future: "Future infrastructure",
 };
 const CATEGORIES: MetricCategory[] = ["accessibility", "infrastructure", "market", "labour", "geography"];
 

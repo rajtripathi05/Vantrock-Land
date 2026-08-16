@@ -124,7 +124,16 @@ describe("runSiteAnalysis", () => {
 
     const categories = new Set(analysis.metrics.map((m) => m.category));
     expect(categories).toEqual(
-      new Set(["geography", "accessibility", "infrastructure", "market", "labour", "climate", "hazard"]),
+      new Set([
+        "geography",
+        "accessibility",
+        "infrastructure",
+        "infrastructure_future",
+        "market",
+        "labour",
+        "climate",
+        "hazard",
+      ]),
     );
   });
 

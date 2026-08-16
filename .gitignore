@@ -22,3 +22,7 @@ data/raw/
 *.pmtiles
 *.osm.pbf
 *.tif
+
+# Runtime dev-server logs (regenerated locally, never committed)
+dev-server.log
+dev-server.err.log
