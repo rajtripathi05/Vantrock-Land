@@ -1,0 +1,52 @@
+{
+  "source_id": "osm_pune_chakan_talegaon_v1",
+  "name": "OpenStreetMap — Pune / Chakan / Talegaon corridor",
+  "provider": "OpenStreetMap contributors, via Overpass API (overpass-api.de)",
+  "source_url": "https://www.openstreetmap.org",
+  "license": "Open Database License (ODbL) 1.0",
+  "attribution": "© OpenStreetMap contributors",
+  "classification": "PRELOADED",
+  "geography": "Pune / Chakan / Talegaon, Maharashtra, India",
+  "bbox": [
+    73.55,
+    18.45,
+    74.05,
+    18.85
+  ],
+  "format": "Normalized JSON (derived from Overpass API JSON)",
+  "data_timestamp": "2026-08-16T09:00:43.980Z",
+  "retrieved_at": "2026-08-16T09:00:43.980Z",
+  "version": 1,
+  "roads": {
+    "count": 5089,
+    "by_class": {
+      "motorway_link": 11,
+      "trunk": 1157,
+      "secondary": 1394,
+      "primary": 1891,
+      "secondary_link": 125,
+      "primary_link": 240,
+      "trunk_link": 239,
+      "motorway": 32
+    },
+    "file": "roads.json"
+  },
+  "pois": {
+    "count": 683,
+    "by_category": {
+      "fuel_station": 136,
+      "rail_station": 82,
+      "industrial_zone": 314,
+      "airport": 4,
+      "warehouse": 85,
+      "power_substation": 61,
+      "industrial_facility": 1
+    },
+    "file": "pois.json"
+  },
+  "places": {
+    "count": 5,
+    "file": "places.json"
+  },
+  "notes": "Preloaded snapshot. Re-run `npm run ingest:osm` to refresh. The application never calls Overpass at request time. `places[].population` is a contributor-entered OSM tag (POPULATION PROXY) — not an official census figure."
+}
